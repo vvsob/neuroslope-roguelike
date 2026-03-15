@@ -27,6 +27,11 @@ ENEMY_NEGATIVE_PROMPT = (
     "photorealistic, 3d render, modern clothing, guns, sci-fi soldier, blurry face, cropped head"
 )
 
+CARD_NEGATIVE_PROMPT = (
+    "text, letters, logo, watermark, border, frame, ui, hud, multiple panels, photorealistic, "
+    "3d render, blurry, low detail, cluttered background, cropped subject"
+)
+
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "src" / "assets" / "generated" / "run"
 
 
@@ -134,7 +139,10 @@ async def _generate_one_async(prompt: str, negative_prompt: str, output_path: Pa
     )
 
 
-async def generate_run_images(image_prompts: Dict[str, Dict[str, str]]) -> None:
+async def generate_run_images(
+    image_prompts: Dict[str, Dict[str, str]],
+    cards: Optional[List[Dict[str, str]]] = None,
+) -> None:
     """
     Generate weapon and enemy images for a LLM-generated run.
 
@@ -168,6 +176,20 @@ async def generate_run_images(image_prompts: Dict[str, Dict[str, str]]) -> None:
                 name=f"{node_id}-{kind}",
             ))
 
+    for card in cards or []:
+        card_id = (card.get("id") or "").strip()
+        if not card_id:
+            continue
+        output_path = OUTPUT_DIR / "cards" / f"{card_id}.png"
+        if output_path.exists():
+            logger.debug("Skipping %s — already exists", output_path.name)
+            continue
+        prompt = _build_card_prompt(card)
+        tasks.append(asyncio.create_task(
+            _safe_generate(prompt, CARD_NEGATIVE_PROMPT, output_path),
+            name=f"card-{card_id}",
+        ))
+
     if tasks:
         await asyncio.gather(*tasks)
 
@@ -177,3 +199,14 @@ async def _safe_generate(prompt: str, neg: str, path: Path) -> None:
         await _generate_one_async(prompt, neg, path)
     except Exception as exc:
         logger.exception("Image generation failed for %s", path.name)
+
+
+def _build_card_prompt(card: Dict[str, str]) -> str:
+    name = card.get("name") or card.get("id") or "Card"
+    description = card.get("description") or ""
+    card_type = card.get("type") or "Skill"
+    return (
+        f"fantasy action card illustration, {name}, {description}, "
+        f"type {card_type}, dark sci-fi roguelike card art, dramatic composition, painterly style, "
+        "single subject, centered composition, readable silhouette, no text"
+    )

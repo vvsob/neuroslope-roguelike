@@ -529,7 +529,7 @@ function renderEnemy(enemy, selectedEnemyId, index) {
 function renderCard(cardId, state, index) {
   const card = getCardDef(cardId, state);
   const disabled = !card || state.player.energy < card.cost || state.outcome;
-  const art = resolveCardArt(cardId, card);
+  const art = resolveCardArt(cardId, card, state);
   return `
     <button class="card" data-action="play-card" data-id="${index}" ${disabled ? "disabled" : ""}>
       <div class="card-top">
@@ -847,7 +847,7 @@ function renderOverlay(state) {
 
 function renderRewardCard(cardId, state) {
   const card = getCardDef(cardId, state);
-  const art = resolveCardArt(cardId, card);
+  const art = resolveCardArt(cardId, card, state);
   return `
     <button class="reward-option" data-action="claim-reward" data-id="${cardId}">
       <p class="eyebrow">${card.type}</p>
@@ -866,7 +866,16 @@ function renderRewardCard(cardId, state) {
   `;
 }
 
-function resolveCardArt(cardId, card) {
+function resolveCardArt(cardId, card, state) {
+  if (state?.cardCatalog?.[cardId]?.image) {
+    return {
+      src: state.cardCatalog[cardId].image,
+      alt: card?.name ?? cardId,
+      fallback: state.cardCatalog[cardId].fallback ?? "./src/assets/player-placeholder.svg",
+      variant: card?.type === "Attack" ? "card-art-weapon" : "card-art-enemy",
+    };
+  }
+
   const cardArt = getCardArt(cardId);
   return {
     src: cardArt.image,

@@ -18,6 +18,7 @@ router = APIRouter(prefix="/game", tags=["Game"])
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RUN_IMAGE_DIR = REPO_ROOT / "src" / "assets" / "generated" / "run"
+RUN_CARD_DIR = RUN_IMAGE_DIR / "cards"
 
 # ── Data libraries (ported from frontend) ─────────────────────────────────────
 
@@ -563,10 +564,11 @@ async def generate_run_for_lobby(
 
     # Start image generation in the background (non-blocking)
     image_prompts = generated_run.get("imagePrompts") or {}
-    img_started = bool(image_prompts)
+    generated_cards = generated_run.get("cards") or []
+    img_started = bool(image_prompts or generated_cards)
     if img_started:
         asyncio.create_task(
-            generate_run_images(image_prompts),
+            generate_run_images(image_prompts, generated_cards),
             name=f"imggen-lobby-{lobby_id}",
         )
 
@@ -635,7 +637,12 @@ def _public_state(state: Dict[str, Any]) -> Dict[str, Any]:
         for cdef in (generated_run.get("cards") or []):
             cid = cdef.get("id")
             if cid:
-                card_catalog[cid] = {k: v for k, v in cdef.items() if k != "behaviors"}
+                entry = {k: v for k, v in cdef.items() if k != "behaviors"}
+                card_image_path = RUN_CARD_DIR / f"{cid}.png"
+                if card_image_path.exists():
+                    entry["image"] = f"/src/assets/generated/run/cards/{cid}.png"
+                    entry["fallback"] = "./src/assets/player-placeholder.svg"
+                card_catalog[cid] = entry
 
     relic_catalog: Dict[str, Any] = {}
     for rid, rdef in RELIC_LIBRARY.items():
