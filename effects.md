@@ -81,6 +81,7 @@ Cards and relics are authored as data, not custom logic.
 - `opponent`
 - `player`
 - `enemy`
+- `allEnemies`
 
 ## Common Stats
 
@@ -95,3 +96,5 @@ Cards and relics are authored as data, not custom logic.
 - A new custom card usually only needs a new object in `src/data/cards.js`.
 - A new custom relic usually only needs a new object in `src/data/relics.js`.
 - If you need a brand new kind of effect, add it once in `src/effectEngine.js`, then future content can use it with data only.
+- In multi-enemy fights, `opponent` and `enemy` resolve to the currently selected enemy. If no enemy is selected, they resolve to the first living enemy.
+- `allEnemies` applies the same effect to every living enemy in the current battle.

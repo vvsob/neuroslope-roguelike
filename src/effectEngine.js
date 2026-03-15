@@ -82,39 +82,46 @@ function executeEffect(state, effect, context) {
   }
 
   if (effect.type === "heal") {
-    const target = resolveTargetUnit(state, effect.target, context);
-    if (!target) {
+    const targets = resolveTargetUnits(state, effect.target, context);
+    if (targets.length === 0) {
       return;
     }
-    target.hp = Math.min(target.maxHp, target.hp + resolveNumericValue(effect.amount, state, context));
+    for (const target of targets) {
+      target.hp = Math.min(target.maxHp, target.hp + resolveNumericValue(effect.amount, state, context));
+    }
     return;
   }
 
   if (effect.type === "modifyStat") {
-    const target = resolveTargetUnit(state, effect.target, context);
-    if (!target) {
+    const targets = resolveTargetUnits(state, effect.target, context);
+    if (targets.length === 0) {
       return;
     }
     const amount = resolveNumericValue(effect.amount, state, context);
-    target[effect.stat] = (target[effect.stat] ?? 0) + amount;
+    for (const target of targets) {
+      target[effect.stat] = (target[effect.stat] ?? 0) + amount;
+    }
     return;
   }
 
   if (effect.type === "damage") {
-    const target = resolveTargetUnit(state, effect.target, context);
-    if (!target) {
+    const targets = resolveTargetUnits(state, effect.target, context);
+    if (targets.length === 0) {
       return;
     }
     const attacker = resolveTargetUnit(state, effect.sourceTarget ?? "self", context);
     let amount = resolveNumericValue(effect.amount, state, context);
-    if (effect.useCombatModifiers && attacker) {
-      amount = calculateDamageWithModifiers({
-        amount,
-        attacker,
-        defender: target,
-      });
+    for (const target of targets) {
+      let resolvedAmount = amount;
+      if (effect.useCombatModifiers && attacker) {
+        resolvedAmount = calculateDamageWithModifiers({
+          amount,
+          attacker,
+          defender: target,
+        });
+      }
+      context.absorbDamage?.(target, resolvedAmount);
     }
-    context.absorbDamage?.(target, amount);
     return;
   }
 
@@ -171,20 +178,40 @@ function resolveNumericValue(value, state, context) {
   return 0;
 }
 
+function resolveTargetUnits(state, target, context) {
+  if (target === "allEnemies") {
+    return getAliveEnemies(state);
+  }
+
+  const unit = resolveTargetUnit(state, target, context);
+  return unit ? [unit] : [];
+}
+
 function resolveTargetUnit(state, target, context) {
   if (target === "player") {
     return state.player;
   }
   if (target === "enemy") {
-    return state.enemy;
+    return getPrimaryEnemy(state, context);
   }
   if (target === "self" || target === "owner") {
-    return context.owner === "enemy" ? state.enemy : state.player;
+    return context.owner === "enemy" ? getPrimaryEnemy(state, context) : state.player;
   }
   if (target === "opponent") {
-    return context.owner === "enemy" ? state.player : state.enemy;
+    return context.owner === "enemy" ? state.player : getPrimaryEnemy(state, context);
   }
   return null;
+}
+
+function getPrimaryEnemy(state, context) {
+  if (context.targetEnemyId) {
+    return getAliveEnemies(state).find((enemy) => enemy.id === context.targetEnemyId) ?? getAliveEnemies(state)[0] ?? null;
+  }
+  return getAliveEnemies(state)[0] ?? null;
+}
+
+function getAliveEnemies(state) {
+  return (state.enemies ?? []).filter((enemy) => enemy.hp > 0);
 }
 
 function calculateDamageWithModifiers({ amount, attacker, defender }) {
@@ -201,7 +228,7 @@ function calculateDamageWithModifiers({ amount, attacker, defender }) {
 function interpolateText(text, state, context) {
   return text
     .replaceAll("{playerName}", state.player.name)
-    .replaceAll("{enemyName}", state.enemy?.name ?? "enemy")
+    .replaceAll("{enemyName}", getAliveEnemies(state)[0]?.name ?? "enemy")
     .replaceAll("{sourceName}", context.source?.name ?? "Effect")
     .replaceAll("{cardName}", context.card?.name ?? "");
 }

@@ -123,13 +123,13 @@ export const CARD_LIBRARY = {
     cost: 1,
     type: "Attack",
     rarity: "Common",
-    description: "Deal 9 damage.",
+    description: "Deal 9 damage to all enemies.",
     behaviors: [
       {
         trigger: "onPlay",
         effects: [
-          { type: "damage", target: "opponent", amount: 9, useCombatModifiers: true },
-          { type: "log", text: "{playerName} tears through the enemy for 9." },
+          { type: "damage", target: "allEnemies", amount: 9, useCombatModifiers: true },
+          { type: "log", text: "{playerName} tears through the enemy line for 9." },
         ],
       },
     ],

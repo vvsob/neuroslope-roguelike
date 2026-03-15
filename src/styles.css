@@ -178,6 +178,9 @@ p {
   display: flex;
   justify-content: center;
   align-items: start;
+  align-content: start;
+  flex-wrap: wrap;
+  gap: 18px;
 }
 
 .player-side {
@@ -195,9 +198,40 @@ p {
   padding-top: 14px;
 }
 
+.enemy-card {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.enemy-card.selected .enemy-frame {
+  transform: translateY(-6px);
+  filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
+}
+
+.enemy-card.selected .portrait {
+  filter:
+    drop-shadow(0 0 18px rgba(255, 215, 160, 0.24))
+    drop-shadow(0 26px 30px rgba(0, 0, 0, 0.35));
+}
+
 .enemy-frame .portrait {
   width: min(280px, 100%);
   margin: 0 auto;
+}
+
+.enemy-nameplate {
+  width: fit-content;
+  max-width: 100%;
+  margin: 10px auto 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 233, 193, 0.14);
+  background: rgba(10, 8, 13, 0.74);
+  color: var(--text);
+  font-size: 0.84rem;
 }
 
 .player-frame {
@@ -720,5 +754,14 @@ code {
 
   .hand-row {
     justify-content: start;
+  }
+
+  .enemy-side {
+    justify-content: center;
+  }
+
+  .enemy-frame .portrait,
+  .player-frame > div {
+    width: min(240px, 100%);
   }
 }

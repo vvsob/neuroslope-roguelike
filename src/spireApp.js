@@ -10,44 +10,88 @@ import {
 const ENCOUNTERS = {
   hallway: [
     {
-      name: "Ash Ghoul",
-      maxHp: 42,
-      intents: [
-        { type: "attack", value: 8, label: "Claw 8" },
-        { type: "buff", strength: 2, label: "Rage +2 Strength" },
-        { type: "attackBlock", value: 6, block: 6, label: "Rake 6 + Block 6" },
+      enemies: [
+        {
+          name: "Ash Ghoul",
+          maxHp: 42,
+          intents: [
+            { type: "attack", value: 8, label: "Claw 8" },
+            { type: "buff", strength: 2, label: "Rage +2 Strength" },
+            { type: "attackBlock", value: 6, block: 6, label: "Rake 6 + Block 6" },
+          ],
+        },
       ],
     },
     {
-      name: "Hollow Spear",
-      maxHp: 38,
-      intents: [
-        { type: "attack", value: 7, label: "Lunge 7" },
-        { type: "attack", value: 7, repeats: 2, label: "Flurry 7x2" },
-        { type: "debuff", weak: 2, label: "Pinning Curse" },
+      enemies: [
+        {
+          name: "Hollow Spear",
+          maxHp: 38,
+          intents: [
+            { type: "attack", value: 7, label: "Lunge 7" },
+            { type: "attack", value: 7, repeats: 2, label: "Flurry 7x2" },
+            { type: "debuff", weak: 2, label: "Pinning Curse" },
+          ],
+        },
+      ],
+    },
+    {
+      enemies: [
+        {
+          name: "Ash Ghoul",
+          maxHp: 36,
+          intents: [
+            { type: "attack", value: 6, label: "Claw 6" },
+            { type: "attackBlock", value: 5, block: 5, label: "Rake 5 + Block 5" },
+          ],
+        },
+        {
+          name: "Hollow Spear",
+          maxHp: 30,
+          intents: [
+            { type: "attack", value: 5, label: "Lunge 5" },
+            { type: "debuff", weak: 1, label: "Pinning Curse" },
+          ],
+        },
       ],
     },
   ],
   elite: [
     {
-      name: "Bronze Husk",
-      maxHp: 68,
-      intents: [
-        { type: "attackBlock", value: 10, block: 8, label: "Crush 10 + Block 8" },
-        { type: "buff", strength: 3, label: "Harden +3 Strength" },
-        { type: "attack", value: 14, label: "Hammerfall 14" },
+      enemies: [
+        {
+          name: "Bronze Husk",
+          maxHp: 68,
+          intents: [
+            { type: "attackBlock", value: 10, block: 8, label: "Crush 10 + Block 8" },
+            { type: "buff", strength: 3, label: "Harden +3 Strength" },
+            { type: "attack", value: 14, label: "Hammerfall 14" },
+          ],
+        },
+        {
+          name: "Shard Wisp",
+          maxHp: 34,
+          intents: [
+            { type: "attack", value: 6, repeats: 2, label: "Needle 6x2" },
+            { type: "buff", strength: 2, label: "Flare +2 Strength" },
+          ],
+        },
       ],
     },
   ],
   boss: [
     {
-      name: "The Neurolith",
-      maxHp: 120,
-      intents: [
-        { type: "attack", value: 16, label: "Pulse 16" },
-        { type: "debuff", vulnerable: 2, weak: 2, label: "Mind Fracture" },
-        { type: "attack", value: 12, repeats: 2, label: "Twin Surge 12x2" },
-        { type: "buff", strength: 4, block: 12, label: "Ascend +4 Strength +12 Block" },
+      enemies: [
+        {
+          name: "The Neurolith",
+          maxHp: 120,
+          intents: [
+            { type: "attack", value: 16, label: "Pulse 16" },
+            { type: "debuff", vulnerable: 2, weak: 2, label: "Mind Fracture" },
+            { type: "attack", value: 12, repeats: 2, label: "Twin Surge 12x2" },
+            { type: "buff", strength: 4, block: 12, label: "Ascend +4 Strength +12 Block" },
+          ],
+        },
       ],
     },
   ],
@@ -93,6 +137,11 @@ export function mountApp(root) {
 
     if (action === "play-card") {
       setState((draft) => playCard(draft, Number(id)));
+      return;
+    }
+
+    if (action === "select-enemy") {
+      setState((draft) => selectEnemyTarget(draft, id));
       return;
     }
 
@@ -171,7 +220,8 @@ function createInitialState() {
       relics: [],
     },
     pendingRelicRewardId: null,
-    enemy: null,
+    enemies: [],
+    selectedEnemyId: null,
     rewardOptions: [],
     log: ["A new ascent begins. Choose your route."],
     battle: null,
@@ -221,8 +271,8 @@ function renderTopBar(state) {
       </div>
       <div class="top-pill">
         <p class="eyebrow">Encounter</p>
-        <h3>${state.enemy ? state.enemy.name : "No active enemy"}</h3>
-        <p class="muted">${state.enemy ? "Battle in progress" : "Choose the next room on the map."}</p>
+        <h3>${describeEncounterHeadline(state)}</h3>
+        <p class="muted">${state.enemies.length > 0 ? "Battle in progress" : "Choose the next room on the map."}</p>
       </div>
     </section>
   `;
@@ -231,12 +281,8 @@ function renderTopBar(state) {
 function renderBattle(state) {
   return `
     <section class="battle-scene">
-      <div class="enemy-side combatant">
-        <div class="combatant-frame enemy-frame">
-          <img class="portrait" src="./src/assets/enemy-placeholder.svg" alt="${state.enemy.name}" />
-          ${renderIntent(state.enemy.intent)}
-          ${renderCombatFooter(state.enemy, "enemy")}
-        </div>
+      <div class="enemy-side">
+        ${state.enemies.map((enemy) => renderEnemy(enemy, state.selectedEnemyId)).join("")}
       </div>
       <div class="player-side combatant">
         <div class="combatant-frame player-frame">
@@ -250,7 +296,7 @@ function renderBattle(state) {
     <section class="battle-controls">
       <div class="battle-sidepanel control-card">
         <h3>Turn</h3>
-        <p>Play cards from the hand below, then end the turn to let the enemy act.</p>
+        <p>Play cards from the hand below, then end the turn to let the enemies act.</p>
         <p class="muted">Cards in hand: ${state.player.hand.length}</p>
         <p class="muted">Draw ${state.player.drawPile.length} | Discard ${state.player.discardPile.length}</p>
         <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
@@ -258,13 +304,27 @@ function renderBattle(state) {
       <div class="hand-panel control-card">
         <div class="hand-head">
           <h3>Hand</h3>
-          <p class="muted">Data-driven cards can react to many events.</p>
+          <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
         </div>
         <div class="hand-row">
           ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
         </div>
       </div>
     </section>
+  `;
+}
+
+function renderEnemy(enemy, selectedEnemyId) {
+  const selectedClass = enemy.id === selectedEnemyId ? "selected" : "";
+  return `
+    <button class="combatant enemy-card ${selectedClass}" data-action="select-enemy" data-id="${enemy.id}">
+      <div class="combatant-frame enemy-frame">
+        <img class="portrait" src="./src/assets/enemy-placeholder.svg" alt="${enemy.name}" />
+        ${renderIntent(enemy.intent)}
+        <div class="enemy-nameplate">${enemy.name}</div>
+        ${renderCombatFooter(enemy, "enemy")}
+      </div>
+    </button>
   `;
 }
 
@@ -407,6 +467,16 @@ function describeIntent(intent) {
     };
   }
   return { icon: "?", name: intent.label, count: "", description: "The enemy is preparing something unusual." };
+}
+
+function describeEncounterHeadline(state) {
+  if (state.enemies.length === 0) {
+    return "No active enemy";
+  }
+  if (state.enemies.length === 1) {
+    return state.enemies[0].name;
+  }
+  return `${state.enemies.length} Enemies`;
 }
 
 function renderNonBattle(state) {
@@ -602,16 +672,19 @@ function travelToNode(state, id) {
 
 function startBattle(state, type) {
   const template = clonePick(ENCOUNTERS[type]);
-  state.enemy = {
-    ...template,
-    hp: template.maxHp,
+  const enemyTemplates = template.enemies ?? [template];
+  state.enemies = enemyTemplates.map((enemyTemplate, index) => ({
+    ...enemyTemplate,
+    id: `enemy-${index}-${enemyTemplate.name.toLowerCase().replaceAll(" ", "-")}`,
+    hp: enemyTemplate.maxHp,
     block: 0,
     strength: 0,
     weak: 0,
     vulnerable: 0,
     intentIndex: 0,
-    intent: template.intents[0],
-  };
+    intent: enemyTemplate.intents[0],
+  }));
+  state.selectedEnemyId = state.enemies[0]?.id ?? null;
 
   state.player.block = 0;
   state.player.energy = state.player.maxEnergy;
@@ -625,7 +698,7 @@ function startBattle(state, type) {
   state.battle = { type };
   triggerRelicEvent(state, "onBattleStart", battleContext(state));
   drawCards(state, 5);
-  addLog(state, `${state.enemy.name} appears with intent: ${state.enemy.intent.label}.`);
+  addLog(state, `${describeEncounterHeadline(state)} appear.`);
 }
 
 function playCard(state, index) {
@@ -649,9 +722,23 @@ function playCard(state, index) {
     state.player.discardPile.push(cardId);
   }
 
-  if (state.enemy.hp <= 0) {
+  processDefeatedEnemies(state);
+  if (state.enemies.length === 0) {
     winBattle(state);
   }
+}
+
+function selectEnemyTarget(state, enemyId) {
+  if (state.screen !== "battle") {
+    return;
+  }
+
+  const enemy = state.enemies.find((entry) => entry.id === enemyId && entry.hp > 0);
+  if (!enemy) {
+    return;
+  }
+
+  state.selectedEnemyId = enemy.id;
 }
 
 function endTurn(state) {
@@ -672,50 +759,57 @@ function endTurn(state) {
   state.player.energy = state.player.maxEnergy;
   triggerRelicEvent(state, "onTurnStart", battleContext(state));
   tickDownStatus(state.player);
-  tickDownStatus(state.enemy);
-  advanceEnemyIntent(state.enemy);
+  for (const enemy of state.enemies) {
+    tickDownStatus(enemy);
+    advanceEnemyIntent(enemy);
+  }
   drawCards(state, 5);
-  addLog(state, `${state.enemy.name} prepares ${state.enemy.intent.label}.`);
+  for (const enemy of state.enemies) {
+    addLog(state, `${enemy.name} prepares ${enemy.intent.label}.`);
+  }
 }
 
 function runEnemyIntent(state) {
-  const intent = state.enemy.intent;
-  if (!intent) {
-    return;
-  }
+  for (const enemy of state.enemies) {
+    const intent = enemy.intent;
+    if (!intent) {
+      continue;
+    }
 
-  if (intent.type === "attack" || intent.type === "attackBlock") {
-    const repeats = intent.repeats ?? 1;
-    for (let index = 0; index < repeats; index += 1) {
-      const damage = adjustedDamage(intent.value + state.enemy.strength, state.enemy.weak, state.player.vulnerable);
-      absorbDamage(state.player, damage);
-      addLog(state, `${state.enemy.name} hits for ${damage}.`);
-      if (state.player.hp <= 0) {
-        state.outcome = "defeat";
-        state.screen = "map";
-        return;
+    if (intent.type === "attack" || intent.type === "attackBlock") {
+      const repeats = intent.repeats ?? 1;
+      for (let index = 0; index < repeats; index += 1) {
+        const damage = adjustedDamage(intent.value + enemy.strength, enemy.weak, state.player.vulnerable);
+        absorbDamage(state.player, damage);
+        addLog(state, `${enemy.name} hits for ${damage}.`);
+        if (state.player.hp <= 0) {
+          state.outcome = "defeat";
+          state.screen = "map";
+          return;
+        }
       }
     }
-  }
 
-  if (intent.type === "attackBlock" && intent.block) {
-    state.enemy.block += intent.block;
-  }
-  if (intent.type === "buff") {
-    state.enemy.strength += intent.strength ?? 0;
-    state.enemy.block += intent.block ?? 0;
-    addLog(state, `${state.enemy.name} grows stronger.`);
-  }
-  if (intent.type === "debuff") {
-    state.player.weak += intent.weak ?? 0;
-    state.player.vulnerable += intent.vulnerable ?? 0;
-    addLog(state, `${state.enemy.name} curses your footing.`);
+    if (intent.type === "attackBlock" && intent.block) {
+      enemy.block += intent.block;
+    }
+    if (intent.type === "buff") {
+      enemy.strength += intent.strength ?? 0;
+      enemy.block += intent.block ?? 0;
+      addLog(state, `${enemy.name} grows stronger.`);
+    }
+    if (intent.type === "debuff") {
+      state.player.weak += intent.weak ?? 0;
+      state.player.vulnerable += intent.vulnerable ?? 0;
+      addLog(state, `${enemy.name} curses your footing.`);
+    }
   }
 }
 
 function winBattle(state) {
-  addLog(state, `${state.enemy.name} falls.`);
-  state.enemy = null;
+  addLog(state, "The encounter is cleared.");
+  state.enemies = [];
+  state.selectedEnemyId = null;
   state.player.block = 0;
   state.player.energy = state.player.maxEnergy;
   state.rewardOptions = pickRewardCards(state.player.deck);
@@ -768,6 +862,17 @@ function absorbDamage(target, damage) {
   const blocked = Math.min(target.block, damage);
   target.block -= blocked;
   target.hp -= damage - blocked;
+}
+
+function processDefeatedEnemies(state) {
+  const defeated = state.enemies.filter((enemy) => enemy.hp <= 0);
+  for (const enemy of defeated) {
+    addLog(state, `${enemy.name} falls.`);
+  }
+  state.enemies = state.enemies.filter((enemy) => enemy.hp > 0);
+  if (!state.enemies.some((enemy) => enemy.id === state.selectedEnemyId)) {
+    state.selectedEnemyId = state.enemies[0]?.id ?? null;
+  }
 }
 
 function tickDownStatus(unit) {
@@ -827,6 +932,7 @@ function battleContext(state, card = null) {
   return {
     state,
     card,
+    targetEnemyId: state.selectedEnemyId,
     absorbDamage,
     drawCards,
   };
