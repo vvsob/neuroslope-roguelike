@@ -281,9 +281,6 @@ function renderTopBar(state) {
 function renderBattle(state) {
   return `
     <section class="battle-scene">
-      <div class="enemy-side">
-        ${state.enemies.map((enemy) => renderEnemy(enemy, state.selectedEnemyId)).join("")}
-      </div>
       <div class="player-side combatant">
         <div class="combatant-frame player-frame">
           <div>
@@ -292,23 +289,31 @@ function renderBattle(state) {
           </div>
         </div>
       </div>
+      <div class="enemy-side">
+        ${state.enemies.map((enemy) => renderEnemy(enemy, state.selectedEnemyId)).join("")}
+      </div>
     </section>
     <section class="battle-controls">
+      <div class="hand-panel control-card">
+        <div class="hand-head">
+          <div class="hand-title">
+            <h3>Hand</h3>
+            <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
+              <span>${state.player.energy}</span>
+            </div>
+          </div>
+          <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
+        </div>
+        <div class="hand-row">
+          ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
+        </div>
+      </div>
       <div class="battle-sidepanel control-card">
         <h3>Turn</h3>
         <p>Play cards from the hand below, then end the turn to let the enemies act.</p>
         <p class="muted">Cards in hand: ${state.player.hand.length}</p>
         <p class="muted">Draw ${state.player.drawPile.length} | Discard ${state.player.discardPile.length}</p>
         <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
-      </div>
-      <div class="hand-panel control-card">
-        <div class="hand-head">
-          <h3>Hand</h3>
-          <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
-        </div>
-        <div class="hand-row">
-          ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
-        </div>
       </div>
     </section>
   `;

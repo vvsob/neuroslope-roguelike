@@ -147,7 +147,7 @@ p {
 .battle-scene {
   position: relative;
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 0.9fr 1.1fr;
   align-items: center;
   min-height: 440px;
   padding: 18px 14px 8px;
@@ -176,7 +176,7 @@ p {
 
 .enemy-side {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: start;
   align-content: start;
   flex-wrap: wrap;
@@ -185,7 +185,7 @@ p {
 
 .player-side {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: end;
 }
 
@@ -468,7 +468,7 @@ p {
 
 .battle-controls {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr 220px;
   gap: 14px;
   align-items: end;
 }
@@ -508,6 +508,39 @@ p {
   align-items: end;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.hand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.energy-orb {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(180, 114, 18, 0.38);
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 250, 198, 0.95), rgba(255, 226, 120, 0.9) 28%, rgba(222, 157, 32, 0.96) 62%, rgba(140, 86, 13, 0.98) 100%);
+  box-shadow:
+    inset 0 2px 6px rgba(255, 255, 255, 0.34),
+    0 8px 16px rgba(0, 0, 0, 0.24);
+  color: #402405;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.energy-orb.empty {
+  border-color: rgba(136, 142, 156, 0.32);
+  background:
+    radial-gradient(circle at 30% 28%, rgba(233, 237, 242, 0.9), rgba(183, 191, 203, 0.86) 30%, rgba(116, 124, 137, 0.94) 68%, rgba(70, 76, 87, 0.98) 100%);
+  box-shadow:
+    inset 0 2px 6px rgba(255, 255, 255, 0.2),
+    0 8px 16px rgba(0, 0, 0, 0.18);
+  color: #f1f4f8;
 }
 
 .hand-row {
