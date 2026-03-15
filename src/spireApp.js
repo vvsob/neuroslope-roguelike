@@ -6,9 +6,10 @@ import {
   triggerCardEvent,
   triggerRelicEvent,
 } from "./effectEngine.js";
-// [FX] [SFX] Import new modules — only two new lines at the top of the file.
 import { triggerFx } from "./fx.js";
 import { playSfx, SFX } from "./sfx.js";
+import { getCardArt } from "./cardArt.js";
+import { getLevelArt } from "./levelArt.js";
 
 const ENCOUNTERS = {
   hallway: [
@@ -115,6 +116,7 @@ export function mountApp(root) {
   }
 
   const state = createInitialState();
+  let animationTimeoutId = null;
 
   function setState(mutator) {
     mutator(state);
@@ -153,6 +155,7 @@ export function mountApp(root) {
 
       // [FX] Fire visuals after render has settled (triggerFx uses rAF internally)
       triggerFx(fxEvents);
+      scheduleCardAnimationCleanup();
       return;
     }
 
@@ -226,6 +229,21 @@ export function mountApp(root) {
   }
 
   render();
+
+  function scheduleCardAnimationCleanup() {
+    if (!state.cardAnimation) {
+      return;
+    }
+
+    if (animationTimeoutId) {
+      clearTimeout(animationTimeoutId);
+    }
+
+    animationTimeoutId = window.setTimeout(() => {
+      state.cardAnimation = null;
+      render();
+    }, 720);
+  }
 }
 
 function createInitialState() {
@@ -263,6 +281,8 @@ function createInitialState() {
     log: ["A new ascent begins. Choose your route."],
     battle: null,
     outcome: null,
+    loadout: getLevelArt("n1"),
+    cardAnimation: null,
   };
 }
 
@@ -271,8 +291,7 @@ function renderApp(state) {
     <div class="spire-app">
       <main class="stage full-stage">
         ${renderTopBar(state)}
-        ${state.screen === "battle" ? renderBattle(state) : renderNonBattle(state)}
-        ${renderDeckStrip(state)}
+        ${state.screen === "battle" ? renderBattle(state) : `${renderNonBattle(state)}${renderDeckStrip(state)}`}
       </main>
       ${renderOverlay(state)}
     </div>
@@ -321,52 +340,104 @@ function renderTopBar(state) {
 
 function renderBattle(state) {
   return `
-    <section class="battle-scene">
-      <div class="player-side combatant" data-combatant="player-0">
-        <div class="combatant-frame player-frame">
-          <div>
-            <img class="portrait" src="./src/assets/player-placeholder.svg" alt="${state.player.name}" />
-            ${renderCombatFooter(state.player, "player")}
-          </div>
-        </div>
-      </div>
-      <div class="enemy-side">
-        ${state.enemies.map((enemy, index) => renderEnemy(enemy, state.selectedEnemyId, index)).join("")}
-      </div>
-    </section>
-    <section class="battle-controls">
-      <div class="hand-panel control-card">
-        <div class="hand-head">
-          <div class="hand-title">
-            <h3>Hand</h3>
-            <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
-              <span>${state.player.energy}</span>
+    <section class="spire-battle-layout">
+      <section class="battle-scene">
+        ${renderCardAnimation(state.cardAnimation)}
+        <div class="player-side combatant" data-combatant="player-0">
+          <div class="combatant-frame player-frame">
+            <div class="player-loadout">
+              <img class="portrait" src="./src/assets/player-placeholder.svg" alt="${state.player.name}" />
+              ${renderCombatFooter(state.player, "player")}
             </div>
           </div>
-          <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
         </div>
-        <div class="hand-row">
-          ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
+        <div class="enemy-side">
+          ${state.enemies.map((enemy, index) => renderEnemy(enemy, state.selectedEnemyId, index)).join("")}
         </div>
-      </div>
-      <div class="battle-sidepanel control-card">
-        <h3>Turn</h3>
-        <p>Play cards from the hand below, then end the turn to let the enemies act.</p>
-        <p class="muted">Cards in hand: ${state.player.hand.length}</p>
-        <p class="muted">Draw ${state.player.drawPile.length} | Discard ${state.player.discardPile.length}</p>
-        <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
-      </div>
+      </section>
+      <section class="battle-hud">
+        <div class="hand-panel">
+          <div class="hand-backdrop"></div>
+          <div class="hand-shell">
+            <div class="hand-head">
+              <div class="hand-title">
+                <h3>Hand</h3>
+                <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
+                  <span>${state.player.energy}</span>
+                </div>
+              </div>
+              <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
+            </div>
+            <div class="hand-row">
+              ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
+            </div>
+          </div>
+        </div>
+        <div class="battle-sidepanel control-card">
+          <p class="eyebrow">Turn</p>
+          <h3>Energy ${state.player.energy}/${state.player.maxEnergy}</h3>
+          <p class="muted">Hand ${state.player.hand.length} | Draw ${state.player.drawPile.length}</p>
+          <p class="muted">Discard ${state.player.discardPile.length} | Exhaust ${state.player.exhaustPile.length}</p>
+          <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
+        </div>
+        <div class="battle-deckbar">
+          <div class="stat-card">
+            <p class="eyebrow">Draw</p>
+            <h3>${state.player.drawPile.length}</h3>
+          </div>
+          <div class="stat-card">
+            <p class="eyebrow">Discard</p>
+            <h3>${state.player.discardPile.length}</h3>
+          </div>
+          <div class="stat-card">
+            <p class="eyebrow">Exhaust</p>
+            <h3>${state.player.exhaustPile.length}</h3>
+          </div>
+        </div>
+      </section>
     </section>
+  `;
+}
+
+function renderCardAnimation(animation) {
+  if (!animation) {
+    return "";
+  }
+
+  return `
+    <div class="card-cast-layer">
+      <div class="card-cast-flare ${animation.variant}"></div>
+      <div class="card-cast-card ${animation.variant}">
+        <img
+          class="card-cast-image"
+          src="${animation.image}"
+          alt="${animation.name}"
+          onerror="this.onerror=null;this.src='${animation.fallback}';"
+        />
+        <div class="card-cast-copy">
+          <p class="eyebrow">${animation.type}</p>
+          <h3>${animation.name}</h3>
+        </div>
+      </div>
+    </div>
   `;
 }
 
 function renderEnemy(enemy, selectedEnemyId, index) {
   const selectedClass = enemy.id === selectedEnemyId ? "selected" : "";
+  const enemyImage = enemy.art?.enemyImage ?? "./src/assets/enemy-placeholder.svg";
   return `
     <button class="combatant enemy-card ${selectedClass}" data-action="select-enemy" data-id="${enemy.id}" data-combatant="enemy-${index}">
       <div class="combatant-frame enemy-frame">
-        <img class="portrait" src="./src/assets/enemy-placeholder.svg" alt="${enemy.name}" />
-        ${renderIntent(enemy.intent)}
+        <div class="enemy-portrait-wrap">
+          <img
+            class="portrait"
+            src="${enemyImage}"
+            alt="${enemy.name}"
+            onerror="this.onerror=null;this.src='./src/assets/enemy-placeholder.svg';"
+          />
+          ${renderIntent(enemy.intent)}
+        </div>
         <div class="enemy-nameplate">${enemy.name}</div>
         ${renderCombatFooter(enemy, "enemy")}
       </div>
@@ -377,11 +448,20 @@ function renderEnemy(enemy, selectedEnemyId, index) {
 function renderCard(cardId, state, index) {
   const card = CARD_LIBRARY[cardId];
   const disabled = !card || state.player.energy < card.cost || state.outcome;
+  const art = resolveCardArt(cardId, card);
   return `
     <button class="card" data-action="play-card" data-id="${index}" ${disabled ? "disabled" : ""}>
       <div class="card-top">
         <div class="card-cost">${card.cost}</div>
         <p class="card-type">${card.type}</p>
+      </div>
+      <div class="card-art-frame ${art.variant}">
+        <img
+          class="card-art-image"
+          src="${art.src}"
+          alt="${art.alt}"
+          onerror="this.onerror=null;this.src='${art.fallback}';"
+        />
       </div>
       <div>
         <h3>${card.name}</h3>
@@ -406,9 +486,11 @@ function nodeGlyph(type) {
 function renderIntent(intent) {
   const info = describeIntent(intent);
   return `
-    <div class="intent-icon" data-tooltip-title="${info.name}" data-tooltip-desc="${info.description}" aria-label="${info.name}">
-      ${info.icon}
-      <span class="intent-count">${info.count}</span>
+    <div class="intent-badge">
+      <div class="intent-icon" data-tooltip-title="${info.name}" data-tooltip-desc="${info.description}" aria-label="${info.name}">
+        <span class="intent-symbol">${info.icon}</span>
+        ${info.count ? `<span class="intent-count">${info.count}</span>` : ""}
+      </div>
     </div>
   `;
 }
@@ -573,6 +655,26 @@ function renderNonBattle(state) {
                   .join("")
           }
         </div>
+        <div class="control-card art-preview-card">
+          <p class="eyebrow">${state.loadout.title}</p>
+          <h3>${state.loadout.enemyName}</h3>
+          <div class="art-preview-grid">
+            <img
+              class="art-preview-image"
+              src="${state.loadout.enemyImage}"
+              alt="${state.loadout.enemyName}"
+              onerror="this.onerror=null;this.src='./src/assets/enemy-placeholder.svg';"
+            />
+            <img
+              class="art-preview-image"
+              src="${state.loadout.weaponImage}"
+              alt="${state.loadout.weaponName}"
+              onerror="this.onerror=null;this.src='./src/assets/player-placeholder.svg';"
+            />
+          </div>
+          <p>${state.loadout.enemyDescription}</p>
+          <p class="muted">Weapon: ${state.loadout.weaponName}</p>
+        </div>
         <div class="control-card">
           <p class="eyebrow">Recent Log</p>
           <div class="log-list">
@@ -664,14 +766,33 @@ function renderOverlay(state) {
 
 function renderRewardCard(cardId) {
   const card = CARD_LIBRARY[cardId];
+  const art = resolveCardArt(cardId, card);
   return `
     <button class="reward-option" data-action="claim-reward" data-id="${cardId}">
       <p class="eyebrow">${card.type}</p>
+      <div class="card-art-frame ${art.variant}">
+        <img
+          class="card-art-image"
+          src="${art.src}"
+          alt="${art.alt}"
+          onerror="this.onerror=null;this.src='${art.fallback}';"
+        />
+      </div>
       <h3>${card.name}</h3>
       <p>${card.description}</p>
       <p class="muted">Cost ${card.cost}</p>
     </button>
   `;
+}
+
+function resolveCardArt(cardId, card) {
+  const cardArt = getCardArt(cardId);
+  return {
+    src: cardArt.image,
+    alt: cardArt.title,
+    fallback: cardArt.fallback,
+    variant: card.type === "Attack" ? "card-art-weapon" : "card-art-enemy",
+  };
 }
 
 function describeScreen(state) {
@@ -699,11 +820,12 @@ function travelToNode(state, id) {
     return;
   }
 
+  state.loadout = getLevelArt(node.id);
   state.floor = node.index + 1;
   addLog(state, `You enter ${node.label}.`);
 
   if (node.type === "hallway" || node.type === "elite" || node.type === "boss") {
-    startBattle(state, node.type);
+    startBattle(state, node);
     return;
   }
   if (node.type === "campfire") {
@@ -716,9 +838,11 @@ function travelToNode(state, id) {
   }
 }
 
-function startBattle(state, type) {
+function startBattle(state, node) {
+  const type = node.type;
   const template = clonePick(ENCOUNTERS[type]);
   const enemyTemplates = template.enemies ?? [template];
+  const art = getLevelArt(node.id);
   state.enemies = enemyTemplates.map((enemyTemplate, index) => ({
     ...enemyTemplate,
     id: `enemy-${index}-${enemyTemplate.name.toLowerCase().replaceAll(" ", "-")}`,
@@ -729,6 +853,7 @@ function startBattle(state, type) {
     vulnerable: 0,
     intentIndex: 0,
     intent: enemyTemplate.intents[0],
+    art,
   }));
   state.selectedEnemyId = state.enemies[0]?.id ?? null;
 
@@ -741,7 +866,8 @@ function startBattle(state, type) {
   state.player.weak = 0;
   state.player.vulnerable = 0;
   state.screen = "battle";
-  state.battle = { type };
+  state.battle = { type: node.type, nodeId: node.id };
+  state.loadout = art;
   triggerRelicEvent(state, "onBattleStart", battleContext(state));
   drawCards(state, 5);
   addLog(state, `${describeEncounterHeadline(state)} appear.`);
@@ -764,6 +890,7 @@ function playCard(state, index) {
   const feedback = buildCardFeedback(card, state);
   triggerCardEvent(state, card, "onPlay", battleContext(state, card));
   triggerRelicEvent(state, "onCardPlayed", battleContext(state, card));
+  state.cardAnimation = createCardAnimation(cardId, card);
 
   if (hasKeyword(card, "exhaust")) {
     state.player.exhaustPile.push(cardId);
@@ -792,6 +919,18 @@ function selectEnemyTarget(state, enemyId) {
   }
 
   state.selectedEnemyId = enemy.id;
+}
+
+function createCardAnimation(cardId, card) {
+  const art = resolveCardArt(cardId, card);
+  return {
+    id: `${cardId}-${Date.now()}`,
+    image: art.src,
+    fallback: art.fallback,
+    name: card.name,
+    type: card.type,
+    variant: card.type === "Attack" ? "attack-cast" : "skill-cast",
+  };
 }
 
 function endTurn(state) {
