@@ -1,128 +1,127 @@
-# Neuroslope Spire Prototype
+# Neuroslope Spire
 
-A lightweight Slay the Spire style prototype built with plain JavaScript and browser UI.
+Neuroslope Spire — браузерный roguelike в духе Slay the Spire, где фронтенд написан на чистом JS, а вся логика игры живёт на FastAPI‑беке. Бекенд симулирует бой и прогресс, фронт только рендерит состояние. И фронт, и API хостятся одним FastAPI‑приложением на порту 8000.
 
-## Features
+**Стек технологий**
 
-- Branching run map with hallway fights, elites, campfires, treasure, and a boss
-- Card combat with energy, draw pile, discard pile, exhaust-style turn flow, and enemy intents
-- Persistent run state across battles
-- Post-combat card rewards and campfire healing
-- Per-floor enemy and weapon art slots with a batch image generation script
-- No build step required
+- Фронтенд: Vanilla JavaScript (ES modules), HTML, CSS
+- Бекенд: FastAPI (ASGI), WebSockets
+- База: SQLite (через SQLAlchemy), миграции Alembic
+- Админка: SQLAdmin
+- Генерация контента LLM: Google Gemini (текст) через `google-generativeai`
+- Генерация изображений: Google Gemini (Nano Banana / Flash Image) через `google-genai`
+- Аудио/FX: Web Audio API и DOM‑эффекты
 
-## Run it
+**Архитектура (верхний уровень)**
 
-Because browsers block ES modules from `file://` URLs, serve the project with a tiny local web server from the repo root.
+1. Игрок регистрируется и получает токен.
+2. Выбирает персонажа и создаёт новую лобби‑игру.
+3. Бекенд генерирует забег (опционально через LLM) и запускает генерацию изображений (Gemini) в фоне.
+4. Фронтенд подключается по WebSocket к лобби и рендерит авторитетное состояние.
+5. Все действия игрока отправляются на сервер, сервер шлёт обновления состояния и события FX/SFX.
+
+**Кратко о геймплее**
+
+- Выбор узла карты (hallway, elite, campfire, treasure, boss).
+- Пошаговые бои: разыгрывание карт, атака, блок, статусы.
+- Завершение хода — враги исполняют намерения.
+- После боя — выбор наградной карты в колоду.
+- У костра можно лечиться, сокровища дают реликвии.
+- Победа над боссом завершает забег.
+
+**Фронтенд**
+
+- `src/spireApp.js` рендерит UI и использует состояние, присланное сервером.
+- `src/fx.js` и `src/sfx.js` обрабатывают визуальные и звуковые события.
+- `src/styles.css` содержит весь UI‑скин.
+- Локальной симуляции нет — фронт только отображает серверную правду.
+
+**Бекенд**
+
+- `app/api/endpoints/game.py` — вся логика игры, протокол WebSocket, генерация забега.
+- `app/api/endpoints/auth.py` — регистрация и выдача токена.
+- `app/api/endpoints/lobby.py` — список персонажей и создание новой игры.
+- `app/db` — модели SQLAlchemy и сессии.
+
+**API (основное)**
+
+- `POST /auth/register` → `{ token }`
+- `GET /lobby/me` → профиль пользователя + список персонажей
+- `POST /lobby/new-game` → `{ id }` id лобби
+- `POST /game/generate/{lobby_id}` → генерирует LLM‑забег и запускает генерацию изображений
+- `WS /game/ws/{lobby_id}?token=...` → поток состояния игры и канал действий
+
+Формат сообщений WebSocket:
+
+- Клиент → сервер:
+  - `{ "type": "action", "action": "travel", "id": "n1" }`
+  - `{ "type": "action", "action": "play-card", "id": 2 }`
+- Сервер → клиент:
+  - `{ "type": "state", "state": { ... }, "fx": [...], "sfx": [...] }`
+
+**Генерация забега (LLM)**
+
+При вызове `POST /game/generate/{lobby_id}` бекенд:
+
+- Использует Gemini для генерации темы, встреч, карт, реликвий, подписей карты и промптов изображений.
+- Сохраняет забег за лобби.
+- Запускает генерацию изображений асинхронно.
+
+Если LLM‑генерация падает, сервер использует встроенный (статический) контент.
+
+**Генерация изображений (Gemini)**
+
+- Арт врагов и оружия для LLM‑забега пишется в:
+  - `src/assets/generated/run/{node_id}-enemy.png`
+  - `src/assets/generated/run/{node_id}-weapon.png`
+- Арт LLM‑карт пишется в:
+  - `src/assets/generated/run/cards/{card_id}.png`
+
+Фронтенд автоматически использует эти картинки, когда они появляются. Если их нет — показываются плейсхолдеры.
+
+Переменные окружения:
+
+- `GEMINI_API_KEY` или `GOOGLE_API_KEY` для текста и изображений
+- `GEMINI_IMAGE_MODEL` для переопределения модели изображений (по умолчанию: `gemini-2.5-flash-image`)
+
+**Запуск проекта**
+
+1. Установить зависимости:
 
 ```bash
-python3 -m http.server 4173
-```
-
-Then open `http://localhost:4173`.
-
-## Generate level art
-
-The game looks for generated images in `src/assets/generated/`. Use the Python script to create enemy and weapon art for all combat themes:
-
-```bash
-HF_TOKEN=your_token_here python3 src/gen_image.py
-```
-
-Generate only one asset family or one floor if needed:
-
-```bash
-HF_TOKEN=your_token_here python3 src/gen_image.py --kind weapon
-HF_TOKEN=your_token_here python3 src/gen_image.py --level n5 --kind enemy
-```
-
-If a generated image is missing, the UI falls back to the placeholder SVGs.
-
-## How to play
-
-- Click a map node to travel
-- Play cards from your hand during combat
-- Click `End Turn` to let the enemy act
-- After combat, choose one reward card to add it to your deck
-- Reach the final boss and survive
-
-# neuroslope-roguelike
-
-Минимальный backend-сервис на **FastAPI + SQLAlchemy + Alembic**.
-
-## Что в проекте
-
-- API: `app/api/main.py`
-- Точка входа ASGI: `app.api.main:app`
-- Миграции: `alembic/`
-- База данных: SQLite (`database.sqlite` в корне проекта)
-
-## Требования
-
-- Python **3.12+**
-- [Poetry](https://python-poetry.org/docs/#installation)
-
-## Установка
-
-Из корня проекта:
-
-```zsh
 poetry install
 ```
 
-## Миграции БД
+2. Применить миграции:
 
-Применить все миграции:
-
-```zsh
+```bash
 poetry run alembic upgrade head
 ```
 
-Создать новую миграцию (если меняли модели):
+3. Запустить сервер (хостит фронт + API):
 
-```zsh
-poetry run alembic revision --autogenerate -m "описание_изменений"
-poetry run alembic upgrade head
-```
-
-## Запуск сервера
-
-```zsh
+```bash
 poetry run uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-После запуска:
+4. Открыть игру:
 
-- Swagger UI: http://127.0.0.1:8000/docs
-- OpenAPI JSON: http://127.0.0.1:8000/openapi.json
-
-## Быстрая проверка API
-
-### Регистрация пользователя
-
-```zsh
-curl -X POST 'http://127.0.0.1:8000/register' \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"test_user"}'
+```
+http://127.0.0.1:8000
 ```
 
-Ожидается JSON с токеном:
+**Troubleshooting**
 
-```json
-{"token":"..."}
-```
+- Если регистрация не работает, убедитесь что бекенд запущен и UI открыт с порта 8000.
+- Если картинки не генерятся, проверьте API‑ключ Gemini и логи сервера.
+- Если видите плейсхолдеры — вероятно, генерация ещё не успела завершиться.
 
-## Частые проблемы
+**Структура проекта (выборочно)**
 
-### 1) `ModuleNotFoundError: No module named 'app'`
-Запускайте команды из **корня проекта** и через `poetry run`.
-
-### 2) Alembic работает не с той SQLite
-В `alembic.ini` уже задан путь через `%(here)s`, поэтому миграции должны идти в `database.sqlite` в корне.
-
-### 3) Порт 8000 занят
-Запустите на другом порту:
-
-```zsh
-poetry run uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8001
-```
+- `app/api/main.py` — FastAPI, роуты, хостинг фронта
+- `app/api/endpoints/game.py` — логика игры и WebSocket протокол
+- `app/api/endpoints/auth.py` — регистрация
+- `app/api/endpoints/lobby.py` — профиль и создание лобби
+- `app/img_gen.py` — генерация изображений Gemini
+- `app/llm_gen.py` — генерация текста Gemini
+- `src/` — фронтенд и ассеты
