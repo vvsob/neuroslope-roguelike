@@ -79,16 +79,16 @@ function renderAuth() {
     <section class="overlay-card screen-card auth-card">
       <div>
         <p class="eyebrow">Neuroslope</p>
-        <h2>Register pilot</h2>
-        <p class="muted">Enter a name to generate your access token.</p>
+        <h2>Регистрация пилота</h2>
+        <p class="muted">Введи имя, чтобы получить токен доступа.</p>
       </div>
       ${renderError()}
       <form class="auth-form" data-action="register">
         <label class="input-field">
-          <span class="muted">Call sign</span>
+          <span class="muted">Позывной</span>
           <input name="name" type="text" placeholder="Warden" value="${escapeHtml(storedName)}" required />
         </label>
-        <button class="button-primary" type="submit">Create token</button>
+        <button class="button-primary" type="submit">Создать токен</button>
       </form>
     </section>
   `;
@@ -103,11 +103,11 @@ function renderMenu() {
     <section class="overlay-card screen-card menu-card">
       <div class="menu-header">
         <div>
-          <p class="eyebrow">Operator</p>
-          <h2>${escapeHtml(app.profile?.name ?? "Pilot")}</h2>
-          <p class="muted">Choose a character to begin a new ascent.</p>
+          <p class="eyebrow">Оператор</p>
+          <h2>${escapeHtml(app.profile?.name ?? "Пилот")}</h2>
+          <p class="muted">Выбери персонажа для нового забега.</p>
         </div>
-        <button class="button-muted" data-action="logout">Switch user</button>
+        <button class="button-muted" data-action="logout">Сменить игрока</button>
       </div>
 
       ${renderError()}
@@ -118,7 +118,7 @@ function renderMenu() {
             const isSelected = String(character.id) === String(selectedId);
             return `
               <button class="character-card ${isSelected ? "selected" : ""}" data-action="select-character" data-id="${character.id}">
-                <p class="eyebrow">Character</p>
+                <p class="eyebrow">Персонаж</p>
                 <h3>${escapeHtml(character.name)}</h3>
                 <p class="muted">HP ${character.health}</p>
               </button>
@@ -128,18 +128,18 @@ function renderMenu() {
       </div>
 
       <div class="menu-actions">
-        <button class="button-primary" data-action="start-game" ${canStart ? "" : "disabled"}>Start new run</button>
+        <button class="button-primary" data-action="start-game" ${canStart ? "" : "disabled"}>Начать новый ран</button>
       </div>
     </section>
   `;
 }
 
 function renderLoading() {
-  const message = app.loadingMessage || "Preparing your run...";
+  const message = app.loadingMessage || "Подготовка рана...";
   return `
     <div class="boot-card">
       <p class="eyebrow">Neuroslope</p>
-      <h1>Loading</h1>
+      <h1>Загрузка</h1>
       <p class="muted">${escapeHtml(message)}</p>
     </div>
   `;
@@ -168,13 +168,13 @@ function bindAuthEvents() {
     const name = String(formData.get("name") || "").trim();
 
     if (!name) {
-      app.error = "Please enter a call sign.";
+      app.error = "Введи позывной.";
       render();
       return;
     }
 
     app.error = null;
-    app.loadingMessage = "Registering pilot...";
+    app.loadingMessage = "Регистрация пилота...";
     app.screen = "boot";
     render();
 
@@ -220,7 +220,7 @@ function bindMenuEvents() {
 
       if (action === "start-game") {
         if (!app.selectedCharacterId) {
-          app.error = "Choose a character to begin.";
+          app.error = "Выбери персонажа, чтобы начать.";
           render();
           return;
         }
@@ -231,7 +231,7 @@ function bindMenuEvents() {
 }
 
 async function loadProfile() {
-  app.loadingMessage = "Syncing roster...";
+  app.loadingMessage = "Синхронизация...";
   app.screen = "boot";
   render();
 
@@ -250,7 +250,7 @@ async function loadProfile() {
 
 async function startNewGame() {
   app.error = null;
-  app.loadingMessage = "Creating new game...";
+  app.loadingMessage = "Создание игры...";
   app.screen = "boot";
   render();
 
@@ -265,20 +265,16 @@ async function startNewGame() {
     }
 
     // Ask the LLM to generate this run's content before connecting.
-    // On failure we fall back to static content gracefully.
+    app.loadingMessage = "Оракул плетёт твою судьбу...";
+    render();
     try {
-      app.loadingMessage = "The oracle shapes your fate...";
-      render();
       const genResult = await apiRequest(`/game/generate/${response.id}`, { method: "POST" });
       if (genResult?.theme) {
-        app.loadingMessage = `Entering: ${genResult.theme}...`;
+        app.loadingMessage = `${genResult.theme}...`;
         render();
       }
     } catch (genError) {
-      // Non-fatal: static content will be used
-      console.warn("LLM generation skipped:", genError?.message);
-      app.loadingMessage = "Connecting to spire...";
-      render();
+      throw new Error("Оракул недоступен — слишком много запросов. Подожди минуту и попробуй снова.");
     }
 
     connectToGame(response.id);
@@ -298,7 +294,7 @@ function connectToGame(lobbyId) {
     return;
   }
 
-  app.loadingMessage = "Connecting to spire...";
+  app.loadingMessage = "Подключение к башне...";
   app.screen = "boot";
   render();
 
@@ -326,23 +322,27 @@ function connectToGame(lobbyId) {
     }
 
     if (data.type === "error") {
-      app.error = data.message || "Server error.";
+      app.error = data.message || "Ошибка сервера.";
     }
   });
 
   ws.addEventListener("close", () => {
+    const intentional = app._intentionalDisconnect;
+    app._intentionalDisconnect = false;
     const wasInGame = app.screen === "game";
     cleanupSocket();
-    app.error = wasInGame
-      ? "Connection lost. Return to the menu to start again."
-      : "Unable to connect to the game server.";
+    if (!intentional) {
+      app.error = wasInGame
+        ? "Соединение потеряно. Вернись в меню и начни заново."
+        : "Не удалось подключиться к серверу.";
+    }
     app.screen = "menu";
     render();
   });
 
   ws.addEventListener("error", () => {
     if (app.screen !== "game") {
-      app.error = "Unable to connect to the game server.";
+      app.error = "Не удалось подключиться к серверу.";
       app.screen = "menu";
       render();
     }
@@ -350,6 +350,15 @@ function connectToGame(lobbyId) {
 }
 
 function sendGameAction(action, id) {
+  if (action === "go-menu") {
+    app._intentionalDisconnect = true;
+    cleanupSocket();
+    app.error = null;
+    app.screen = "menu";
+    render();
+    return;
+  }
+
   if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
     return;
   }

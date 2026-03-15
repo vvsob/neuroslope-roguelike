@@ -70,6 +70,42 @@ function after(ms, fn) {
   return setTimeout(fn, ms);
 }
 
+// ── Enemy lunge animation ─────────────────────────────────────────────────────
+
+/**
+ * Briefly lunges the enemy sprite toward the player and snaps back.
+ * Used before each enemy damage hit to telegraph the attack.
+ */
+function fxEnemyLunge(enemyEl) {
+  if (!enemyEl) return;
+  // Lunge left (toward player) then snap back
+  enemyEl.style.transition = "transform 120ms ease-out";
+  enemyEl.style.transform = "translateX(-28px) scaleX(0.92)";
+  after(120, () => {
+    enemyEl.style.transition = "transform 200ms cubic-bezier(0.22,1,0.36,1)";
+    enemyEl.style.transform = "";
+    after(210, () => {
+      enemyEl.style.transition = "";
+    });
+  });
+}
+
+/**
+ * Briefly shakes the enemy sprite (used for buff/debuff on enemy).
+ */
+function fxEnemyShake(enemyEl) {
+  if (!enemyEl) return;
+  enemyEl.style.transition = "transform 80ms ease-in-out";
+  enemyEl.style.transform = "translateX(8px)";
+  after(80, () => {
+    enemyEl.style.transform = "translateX(-8px)";
+    after(80, () => {
+      enemyEl.style.transform = "";
+      enemyEl.style.transition = "";
+    });
+  });
+}
+
 // ── Individual effect painters ────────────────────────────────────────────────
 
 function fxDamage(targetEl, value) {
@@ -284,25 +320,83 @@ function buildSelector(target) {
 
 /**
  * Fire a batch of visual effects.
- * Deferred one rAF so the DOM is settled after innerHTML re-render.
+ *
+ * Enemy damage events play sequentially with a lunge animation before each hit.
+ * Other events (player damage, block, buff, etc.) fire immediately in one rAF.
+ *
+ * Enemy-sourced damage is detected by target being "player" or "player:*".
+ * Each sequential hit is separated by ENEMY_HIT_INTERVAL ms.
  *
  * @param {Array<{type:string, target:string, value?:number, label?:string}>} events
  */
+const ENEMY_HIT_INTERVAL = 480; // ms between sequential enemy attacks
+
 export function triggerFx(events) {
   if (!events || events.length === 0) return;
-  requestAnimationFrame(() => {
-    for (const ev of events) {
-      const el = resolveTarget(buildSelector(ev.target ?? "enemy"));
-      if (!el) continue;
-      switch (ev.type) {
-        case "damage": fxDamage(el, ev.value ?? 0); break;
-        case "block":  fxBlock(el,  ev.value ?? 0); break;
-        case "heal":   fxHeal(el,   ev.value ?? 0); break;
-        case "buff":   fxBuff(el,   ev.label ?? ""); break;
-        case "debuff": fxDebuff(el, ev.label ?? ""); break;
-        // "poison" | "burn" | "freeze" | "draw" | "exhaust" → implement when needed
-        default: break;
-      }
+
+  // Split into sequential enemy hits vs instant effects
+  const enemyHits = [];
+  const instant = [];
+  for (const ev of events) {
+    const tgt = ev.target ?? "";
+    const isEnemyAttack = ev.type === "damage" &&
+      (tgt === "player" || tgt === "player:0" || /^player:\d+$/.test(tgt));
+    if (isEnemyAttack) {
+      enemyHits.push(ev);
+    } else {
+      instant.push(ev);
     }
-  });
+  }
+
+  // Fire instant effects (player's own attacks, blocks, buffs) right away
+  if (instant.length > 0) {
+    requestAnimationFrame(() => {
+      for (const ev of instant) {
+        _playEffect(ev);
+      }
+    });
+  }
+
+  // Fire enemy hits one-by-one with a lunge + delay
+  if (enemyHits.length > 0) {
+    enemyHits.forEach((ev, i) => {
+      after(i * ENEMY_HIT_INTERVAL, () => {
+        requestAnimationFrame(() => {
+          // Lunge the enemy sprite that's attacking (if identifiable)
+          // enemy:0 → [data-combatant="enemy-0"], fallback .enemy-side
+          const enemySelector = _guessAttackingEnemySelector(ev);
+          const enemyEl = resolveTarget(enemySelector);
+          if (enemyEl) fxEnemyLunge(enemyEl);
+
+          // Show hit on player ~100ms after lunge starts (impact frame)
+          after(100, () => {
+            const targetEl = resolveTarget(buildSelector(ev.target ?? "player"));
+            if (targetEl) fxDamage(targetEl, ev.value ?? 0);
+          });
+        });
+      });
+    });
+  }
+}
+
+/**
+ * Try to find the enemy element that's doing the attacking.
+ * If the event has no explicit enemy reference we fall back to .enemy-side.
+ */
+function _guessAttackingEnemySelector(ev) {
+  // Events may carry a sourceTarget like "enemy:0" in future; for now use first enemy
+  return ".enemy-side, [data-combatant^='enemy-']";
+}
+
+function _playEffect(ev) {
+  const el = resolveTarget(buildSelector(ev.target ?? "enemy"));
+  if (!el) return;
+  switch (ev.type) {
+    case "damage": fxDamage(el, ev.value ?? 0); break;
+    case "block":  fxBlock(el,  ev.value ?? 0); break;
+    case "heal":   fxHeal(el,   ev.value ?? 0); break;
+    case "buff":   fxBuff(el,   ev.label ?? ""); fxEnemyShake(resolveTarget(".enemy-side")); break;
+    case "debuff": fxDebuff(el, ev.label ?? ""); break;
+    default: break;
+  }
 }

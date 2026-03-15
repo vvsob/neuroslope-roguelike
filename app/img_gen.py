@@ -19,17 +19,20 @@ logger = logging.getLogger(__name__)
 
 WEAPON_NEGATIVE_PROMPT = (
     "character, hand holding weapon, enemy, creature, ui, hud, text, letters, watermark, logo, "
-    "border, frame, collage, photorealistic, 3d render, low detail, blurry, cluttered composition"
+    "border, frame, collage, photorealistic, 3d render, CGI, plastic texture, studio lighting, "
+    "low detail, blurry, cluttered composition, anime, cartoon, flat design"
 )
 
 ENEMY_NEGATIVE_PROMPT = (
     "weapon only, multiple enemies, ui, hud, text, letters, watermark, logo, border, frame, "
-    "photorealistic, 3d render, modern clothing, guns, sci-fi soldier, blurry face, cropped head"
+    "photorealistic, 3d render, CGI, plastic skin, studio photo, modern clothing, guns, "
+    "sci-fi soldier, blurry face, cropped head, anime, cartoon, flat illustration"
 )
 
 CARD_NEGATIVE_PROMPT = (
     "text, letters, logo, watermark, border, frame, ui, hud, multiple panels, photorealistic, "
-    "3d render, blurry, low detail, cluttered background, cropped subject"
+    "3d render, CGI, plastic texture, studio lighting, blurry, low detail, "
+    "cluttered background, cropped subject, anime, flat vector art"
 )
 
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "src" / "assets" / "generated" / "run"
@@ -206,9 +209,9 @@ def _build_card_prompt(card: Dict[str, str], world_style: str = "") -> str:
     name = card.get("name") or card.get("id") or "Card"
     description = card.get("description") or ""
     card_type = card.get("type") or "Skill"
-    style_prefix = f"{world_style}, " if world_style else "dark sci-fi roguelike card art, "
+    style_prefix = f"{world_style}, " if world_style else "dark sci-fi roguelike, oil painting style, hand-painted, "
     return (
-        f"{style_prefix}fantasy action card illustration, {name}, {description}, "
-        f"type {card_type}, dramatic composition, painterly style, "
-        "single subject, centered composition, readable silhouette, no text"
+        f"{style_prefix}action card illustration, {name}, {description}, "
+        f"type {card_type}, dramatic composition, oil painting texture, visible brushstrokes, "
+        "single subject, centered composition, readable silhouette, no text, no UI elements"
     )
