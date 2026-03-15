@@ -4,6 +4,7 @@ from sqladmin import Admin, ModelView
 from app.crud.user import UserCRUD
 from app.api.endpoints.auth import router as auth_router
 from app.api.endpoints.lobby import router as lobby_router
+from app.api.endpoints.game import router as game_router
 
 from app.db import engine, Base
 from app.db.models import *
@@ -27,3 +28,4 @@ for model_class in Base.__subclasses__():
     admin.add_view(view_class)
 app.include_router(auth_router)
 app.include_router(lobby_router)
+app.include_router(game_router)

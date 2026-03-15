@@ -26,7 +26,7 @@ async def create_new_game(lobby_data: LobbyCreate, current_user: User = Depends(
     if character is None:
         return {"error": "Character not found"}
 
-    game = await GameCRUD.create_game(user_id=current_user.id, character_id=character.id)
+    game, game_user = await GameCRUD.create_game(user_id=current_user.id, character_id=character.id)
 
     return {
         "id": game.id
