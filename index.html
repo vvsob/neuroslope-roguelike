@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neuroslope Spire Prototype</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <div class="boot-card">
+        <p class="eyebrow">Neuroslope</p>
+        <h1>Spire Prototype</h1>
+        <p>Booting run...</p>
+      </div>
+    </div>
+
+    <script>
+      const appNode = document.getElementById("app");
+
+      if (window.location.protocol === "file:" && appNode) {
+        appNode.innerHTML =
+          '<div class="boot-card"><p class="eyebrow">Startup issue</p><h1>Use a local server</h1><p>Run <code>python3 -m http.server 4173</code> in the project folder, then open <code>http://localhost:4173</code>.</p></div>';
+      }
+
+      window.addEventListener("error", (event) => {
+        if (!appNode) {
+          return;
+        }
+
+        const message = event?.message || "Unknown startup error.";
+        appNode.innerHTML =
+          `<div class="boot-card"><p class="eyebrow">Startup issue</p><h1>App failed to load</h1><p>${message}</p></div>`;
+      });
+    </script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
