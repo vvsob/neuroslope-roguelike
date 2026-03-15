@@ -1,3 +1,16 @@
+// [FX] [SFX] Import new modules — only two new lines at the top of the file.
+import { triggerFx } from "./fx.js";
+import { playSfx, SFX } from "./sfx.js";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// No changes below this line until CARD_LIBRARY — only the return values of
+// each card's play() function are extended.
+//
+// Backward-compat rule kept throughout:
+//   card.play() may return a plain string  OR  { log, fx, sfx }
+//   playCard() handles both forms (see extractCardResult helper at bottom).
+// ─────────────────────────────────────────────────────────────────────────────
+
 const STARTING_DECK = [
   "strike",
   "strike",
@@ -19,8 +32,12 @@ const CARD_LIBRARY = {
     type: "Attack",
     description: "Deal 6 damage.",
     play(state) {
-      dealDamage(state, 6);
-      return "You slash for 6.";
+      const dmg = dealDamage(state, 6); // [FX] dealDamage now returns actual damage
+      return {
+        log: `You slash for ${dmg}.`,
+        fx:  [{ type: "damage", target: "enemy", value: dmg }],
+        sfx: ["cardPlay", "attack"],
+      };
     },
   },
   defend: {
@@ -31,7 +48,11 @@ const CARD_LIBRARY = {
     description: "Gain 5 block.",
     play(state) {
       state.player.block += 5;
-      return "You brace for 5 block.";
+      return {
+        log: "You brace for 5 block.",
+        fx:  [{ type: "block", target: "player", value: 5 }],
+        sfx: ["cardPlay", "block"],
+      };
     },
   },
   bash: {
@@ -41,9 +62,16 @@ const CARD_LIBRARY = {
     type: "Attack",
     description: "Deal 8 damage. Apply 2 Vulnerable.",
     play(state) {
-      dealDamage(state, 8);
+      const dmg = dealDamage(state, 8); // [FX]
       state.enemy.vulnerable += 2;
-      return "You bash for 8 and apply Vulnerable.";
+      return {
+        log: `You bash for ${dmg} and apply Vulnerable.`,
+        fx: [
+          { type: "damage", target: "enemy", value: dmg },
+          { type: "debuff", target: "enemy", label: "Vulnerable ×2" },
+        ],
+        sfx: ["cardPlay", "attack", "debuff"],
+      };
     },
   },
   focus: {
@@ -54,7 +82,11 @@ const CARD_LIBRARY = {
     description: "Gain 2 Strength this combat.",
     play(state) {
       state.player.strength += 2;
-      return "Your stance sharpens. Gain 2 Strength.";
+      return {
+        log: "Your stance sharpens. Gain 2 Strength.",
+        fx:  [{ type: "buff", target: "player", label: "+2 Strength" }],
+        sfx: ["cardPlay", "buff"],
+      };
     },
   },
   quick_slash: {
@@ -64,9 +96,13 @@ const CARD_LIBRARY = {
     type: "Attack",
     description: "Deal 7 damage. Draw 1 card.",
     play(state) {
-      dealDamage(state, 7);
+      const dmg = dealDamage(state, 7); // [FX]
       drawCards(state, 1);
-      return "Quick Slash hits for 7 and cycles your hand.";
+      return {
+        log: `Quick Slash hits for ${dmg} and cycles your hand.`,
+        fx:  [{ type: "damage", target: "enemy", value: dmg }],
+        sfx: ["cardPlay", "attack"],
+      };
     },
   },
   iron_shell: {
@@ -78,7 +114,14 @@ const CARD_LIBRARY = {
     play(state) {
       state.player.block += 7;
       state.player.metallicize += 1;
-      return "Iron Shell grants 7 block and lasting plating.";
+      return {
+        log: "Iron Shell grants 7 block and lasting plating.",
+        fx: [
+          { type: "block", target: "player", value: 7 },
+          { type: "buff",  target: "player", label: "Metallicize +1" },
+        ],
+        sfx: ["cardPlay", "block", "buff"],
+      };
     },
   },
   cleave: {
@@ -88,8 +131,12 @@ const CARD_LIBRARY = {
     type: "Attack",
     description: "Deal 9 damage.",
     play(state) {
-      dealDamage(state, 9);
-      return "Cleave tears through the enemy for 9.";
+      const dmg = dealDamage(state, 9); // [FX]
+      return {
+        log: `Cleave tears through the enemy for ${dmg}.`,
+        fx:  [{ type: "damage", target: "enemy", value: dmg }],
+        sfx: ["cardPlay", "attack"],
+      };
     },
   },
   second_wind: {
@@ -101,7 +148,11 @@ const CARD_LIBRARY = {
     exhaust: true,
     play(state) {
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + 4);
-      return "You recover 4 HP.";
+      return {
+        log: "You recover 4 HP.",
+        fx:  [{ type: "heal", target: "player", value: 4 }],
+        sfx: ["cardPlay", "heal"],
+      };
     },
   },
 };
@@ -191,12 +242,35 @@ export function mountApp(root) {
     }
 
     if (action === "play-card") {
-      setState((draft) => playCard(draft, id));
+      // [FX] [SFX] Capture fx/sfx events from card result before re-render
+      let fxEvents = [];
+      let sfxList  = [];
+
+      setState((draft) => {
+        const result = playCard(draft, id);
+        if (result) { fxEvents = result.fx; sfxList = result.sfx; }
+      });
+
+      // [SFX] Play sounds (user-gesture context, no autoplay block)
+      for (const s of sfxList) playSfx(s);
+
+      // [FX] Fire visuals after render has settled (triggerFx uses rAF internally)
+      triggerFx(fxEvents);
       return;
     }
 
     if (action === "end-turn") {
-      setState((draft) => endTurn(draft));
+      // [FX] [SFX] Capture enemy-intent fx/sfx events
+      let fxEvents = [];
+      let sfxList  = [];
+
+      setState((draft) => {
+        const result = endTurn(draft);
+        if (result) { fxEvents = result.fx; sfxList = result.sfx; }
+      });
+
+      for (const s of sfxList) playSfx(s);
+      triggerFx(fxEvents);
       return;
     }
 
@@ -219,6 +293,8 @@ export function mountApp(root) {
         completeCurrentNode(draft);
         draft.screen = "map";
       });
+      // [SFX]
+      playSfx("heal");
       return;
     }
 
@@ -230,6 +306,15 @@ export function mountApp(root) {
         completeCurrentNode(draft);
         draft.screen = "map";
       });
+      // [SFX]
+      playSfx("buff");
+      return;
+    }
+
+    // [SFX] Sound toggle button — no state mutation needed
+    if (action === "toggle-sfx") { // [SFX]
+      SFX.toggle();
+      render(); // re-render to update button label
       return;
     }
 
@@ -321,6 +406,10 @@ function renderTopBar(state) {
         <p class="eyebrow">Encounter</p>
         <h3>${state.enemy ? state.enemy.name : "No active enemy"}</h3>
         <p class="muted">${state.enemy ? "Battle in progress" : "Choose the next room on the map."}</p>
+        <!-- [SFX] Sound toggle -->
+        <button class="button-muted" style="margin-top:8px;padding:5px 10px;font-size:0.8rem;border-radius:12px;" data-action="toggle-sfx">
+          ${SFX.enabled ? "🔊 Sound on" : "🔇 Sound off"}
+        </button>
       </div>
     </section>
   `;
@@ -329,14 +418,15 @@ function renderTopBar(state) {
 function renderBattle(state) {
   return `
     <section class="battle-scene">
-      <div class="enemy-side combatant">
+      <!-- [FX] data-combatant stamps for multi-enemy targeting via fx.js buildSelector -->
+      <div class="enemy-side combatant" data-combatant="enemy-0">
         <div class="combatant-frame enemy-frame">
           <img class="portrait" src="./src/assets/enemy-placeholder.svg" alt="${state.enemy.name}" />
           ${renderIntent(state.enemy.intent)}
           ${renderCombatFooter(state.enemy, "enemy")}
         </div>
       </div>
-      <div class="player-side combatant">
+      <div class="player-side combatant" data-combatant="player-0">
         <div class="combatant-frame player-frame">
           <div>
             <img class="portrait" src="./src/assets/player-placeholder.svg" alt="${state.player.name}" />
@@ -762,20 +852,25 @@ function startBattle(state, type) {
   addLog(state, `${state.enemy.name} appears with intent: ${state.enemy.intent.label}.`);
 }
 
+// [FX] [SFX] playCard now returns { fx, sfx } so the caller (handleAction) can
+// fire them after re-render — no change to the public call signature.
 function playCard(state, index) {
   if (state.screen !== "battle" || state.outcome) {
-    return;
+    return null; // [FX]
   }
 
   const cardId = state.player.hand[index];
   const card = CARD_LIBRARY[cardId];
   if (!card || card.cost > state.player.energy) {
-    return;
+    return null; // [FX]
   }
 
   state.player.energy -= card.cost;
   state.player.hand.splice(index, 1);
-  const message = card.play(state);
+  const raw = card.play(state);
+
+  // [FX] Support both old string returns and new { log, fx, sfx } returns
+  const { message, fx, sfx } = extractCardResult(raw);
 
   if (card.exhaust) {
     state.player.exhaustPile.push(cardId);
@@ -787,20 +882,28 @@ function playCard(state, index) {
 
   if (state.enemy.hp <= 0) {
     winBattle(state);
+    // [SFX] victory sound queued by caller via sfx list
+    return { fx, sfx: [...sfx, "victory"] };
   }
+
+  return { fx, sfx }; // [FX] [SFX]
 }
 
+// [FX] endTurn now returns { fx, sfx } for enemy-intent visuals & sounds.
 function endTurn(state) {
   if (state.screen !== "battle" || state.outcome) {
-    return;
+    return null;
   }
 
   state.player.discardPile.push(...state.player.hand);
   state.player.hand = [];
-  runEnemyIntent(state);
+
+  // [FX] Collect enemy-intent fx/sfx before state mutation
+  const intentResult = runEnemyIntent(state); // [FX] now returns { fx, sfx }
 
   if (state.outcome === "defeat") {
-    return;
+    // [SFX] defeat sound appended
+    return { fx: intentResult?.fx ?? [], sfx: [...(intentResult?.sfx ?? []), "defeat"] };
   }
 
   state.player.block = state.player.metallicize;
@@ -810,13 +913,17 @@ function endTurn(state) {
   advanceEnemyIntent(state.enemy);
   drawCards(state, 5);
   addLog(state, `${state.enemy.name} prepares ${state.enemy.intent.label}.`);
+
+  return intentResult ?? { fx: [], sfx: [] }; // [FX]
 }
 
+// [FX] runEnemyIntent now returns { fx, sfx } instead of void.
 function runEnemyIntent(state) {
   const intent = state.enemy.intent;
-  if (!intent) {
-    return;
-  }
+  if (!intent) return { fx: [], sfx: [] }; // [FX]
+
+  const fxEvents = []; // [FX]
+  const sfxList  = []; // [SFX]
 
   if (intent.type === "attack" || intent.type === "attackBlock") {
     const repeats = intent.repeats ?? 1;
@@ -824,29 +931,41 @@ function runEnemyIntent(state) {
       const damage = adjustedDamage(intent.value + state.enemy.strength, state.enemy.weak, state.player.vulnerable);
       absorbDamage(state.player, damage);
       addLog(state, `${state.enemy.name} hits for ${damage}.`);
+
+      fxEvents.push({ type: "damage", target: "player", value: damage }); // [FX]
+      sfxList.push("enemyAttack"); // [SFX]
+
       if (state.player.hp <= 0) {
         state.outcome = "defeat";
         state.screen = "map";
-        return;
+        return { fx: fxEvents, sfx: sfxList }; // [FX]
       }
     }
   }
 
   if (intent.type === "attackBlock" && intent.block) {
     state.enemy.block += intent.block;
+    fxEvents.push({ type: "block", target: "enemy", value: intent.block }); // [FX]
+    sfxList.push("block"); // [SFX]
   }
 
   if (intent.type === "buff") {
     state.enemy.strength += intent.strength ?? 0;
-    state.enemy.block += intent.block ?? 0;
+    state.enemy.block    += intent.block ?? 0;
     addLog(state, `${state.enemy.name} grows stronger.`);
+    fxEvents.push({ type: "buff", target: "enemy", label: intent.label }); // [FX]
+    sfxList.push("buff"); // [SFX]
   }
 
   if (intent.type === "debuff") {
-    state.player.weak += intent.weak ?? 0;
+    state.player.weak       += intent.weak ?? 0;
     state.player.vulnerable += intent.vulnerable ?? 0;
     addLog(state, `${state.enemy.name} curses your footing.`);
+    fxEvents.push({ type: "debuff", target: "player", label: intent.label }); // [FX]
+    sfxList.push("debuff"); // [SFX]
   }
+
+  return { fx: fxEvents, sfx: sfxList }; // [FX]
 }
 
 function winBattle(state) {
@@ -889,6 +1008,8 @@ function completeCurrentNode(state) {
   unlockNextNode(state);
 }
 
+// [FX] dealDamage now returns the actual damage value so card.play() can
+//      include it in its fx event without re-computing.
 function dealDamage(state, baseAmount) {
   const damage = adjustedDamage(
     baseAmount + state.player.strength,
@@ -896,6 +1017,7 @@ function dealDamage(state, baseAmount) {
     state.enemy.vulnerable,
   );
   absorbDamage(state.enemy, damage);
+  return damage; // [FX] was: void
 }
 
 function adjustedDamage(amount, weak, targetVulnerable) {
@@ -962,4 +1084,25 @@ function shuffle(items) {
 
 function clonePick(list) {
   return structuredClone(list[Math.floor(Math.random() * list.length)]);
+}
+
+// ── [FX] Helper ───────────────────────────────────────────────────────────────
+
+/**
+ * Normalises a card play() return value.
+ * Accepts both the old plain-string format and the new { log, fx, sfx } format.
+ * This lets cards that haven't been updated yet continue to work unchanged.
+ *
+ * @param {string | {log:string, fx:Array, sfx:Array}} raw
+ * @returns {{ message:string, fx:Array, sfx:Array }}
+ */
+function extractCardResult(raw) {
+  if (typeof raw === "string") {
+    return { message: raw, fx: [], sfx: [] };
+  }
+  return {
+    message: raw.log  ?? "",
+    fx:      raw.fx   ?? [],
+    sfx:     raw.sfx  ?? [],
+  };
 }
