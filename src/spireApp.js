@@ -406,7 +406,14 @@ function renderEnemy(enemy, selectedEnemyId, index) {
   const selectedClass = enemy.id === selectedEnemyId ? "selected" : "";
   const enemyImage = enemy.art?.enemyImage ?? "./src/assets/enemy-placeholder.svg";
   return `
-    <button class="combatant enemy-card ${selectedClass}" data-action="select-enemy" data-id="${enemy.id}" data-combatant="enemy-${index}">
+    <button
+      class="combatant enemy-card ${selectedClass}"
+      data-action="select-enemy"
+      data-id="${enemy.id}"
+      data-combatant="enemy-${index}"
+      aria-pressed="${enemy.id === selectedEnemyId ? "true" : "false"}"
+      aria-label="Target ${enemy.name}"
+    >
       <div class="combatant-frame enemy-frame">
         <div class="enemy-portrait-wrap">
           <img

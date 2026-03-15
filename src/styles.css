@@ -217,6 +217,8 @@ p {
   border: 0;
   background: transparent;
   box-shadow: none;
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
 }
 
 .enemy-frame {
@@ -228,6 +230,52 @@ p {
 .enemy-portrait-wrap {
   position: relative;
   width: 100%;
+}
+
+.enemy-portrait-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 22px;
+  border: 2px solid transparent;
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  pointer-events: none;
+}
+
+.enemy-card:hover {
+  transform: translateY(-4px);
+}
+
+.enemy-card:hover .enemy-portrait-wrap::after {
+  opacity: 0.55;
+  transform: scale(1);
+  border-color: rgba(210, 170, 97, 0.28);
+}
+
+.enemy-card.selected {
+  transform: translateY(-8px) scale(1.02);
+}
+
+.enemy-card.selected .enemy-portrait-wrap::after {
+  opacity: 1;
+  transform: scale(1);
+  border-color: rgba(210, 170, 97, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 170, 0.18),
+    0 0 26px rgba(210, 170, 97, 0.28);
+}
+
+.enemy-card.selected .portrait {
+  filter:
+    drop-shadow(0 0 18px rgba(210, 170, 97, 0.18))
+    drop-shadow(0 24px 30px rgba(0, 0, 0, 0.38));
+}
+
+.enemy-card.selected .enemy-nameplate {
+  color: #fff7e7;
+  text-shadow: 0 0 14px rgba(210, 170, 97, 0.24);
 }
 
 .player-loadout {
