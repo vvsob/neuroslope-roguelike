@@ -6,6 +6,9 @@ import {
   triggerCardEvent,
   triggerRelicEvent,
 } from "./effectEngine.js";
+// [FX] [SFX] Import new modules — only two new lines at the top of the file.
+import { triggerFx } from "./fx.js";
+import { playSfx, SFX } from "./sfx.js";
 
 const ENCOUNTERS = {
   hallway: [
@@ -136,7 +139,20 @@ export function mountApp(root) {
     }
 
     if (action === "play-card") {
-      setState((draft) => playCard(draft, Number(id)));
+      // [FX] [SFX] Capture fx/sfx events from card result before re-render
+      let fxEvents = [];
+      let sfxList  = [];
+
+      setState((draft) => {
+        const result = playCard(draft, Number(id));
+        if (result) { fxEvents = result.fx; sfxList = result.sfx; }
+      });
+
+      // [SFX] Play sounds (user-gesture context, no autoplay block)
+      for (const s of sfxList) playSfx(s);
+
+      // [FX] Fire visuals after render has settled (triggerFx uses rAF internally)
+      triggerFx(fxEvents);
       return;
     }
 
@@ -146,7 +162,17 @@ export function mountApp(root) {
     }
 
     if (action === "end-turn") {
-      setState((draft) => endTurn(draft));
+      // [FX] [SFX] Capture enemy-intent fx/sfx events
+      let fxEvents = [];
+      let sfxList  = [];
+
+      setState((draft) => {
+        const result = endTurn(draft);
+        if (result) { fxEvents = result.fx; sfxList = result.sfx; }
+      });
+
+      for (const s of sfxList) playSfx(s);
+      triggerFx(fxEvents);
       return;
     }
 
@@ -169,6 +195,8 @@ export function mountApp(root) {
         completeCurrentNode(draft);
         draft.screen = "map";
       });
+      // [SFX]
+      playSfx("heal");
       return;
     }
 
@@ -179,6 +207,15 @@ export function mountApp(root) {
         draft.pendingRelicRewardId = null;
         draft.screen = "map";
       });
+      // [SFX]
+      playSfx("buff");
+      return;
+    }
+
+    // [SFX] Sound toggle button — no state mutation needed
+    if (action === "toggle-sfx") { // [SFX]
+      SFX.toggle();
+      render(); // re-render to update button label
       return;
     }
 
@@ -273,6 +310,10 @@ function renderTopBar(state) {
         <p class="eyebrow">Encounter</p>
         <h3>${describeEncounterHeadline(state)}</h3>
         <p class="muted">${state.enemies.length > 0 ? "Battle in progress" : "Choose the next room on the map."}</p>
+        <!-- [SFX] Sound toggle -->
+        <button class="button-muted" style="margin-top:8px;padding:5px 10px;font-size:0.8rem;border-radius:12px;" data-action="toggle-sfx">
+          ${SFX.enabled ? "🔊 Sound on" : "🔇 Sound off"}
+        </button>
       </div>
     </section>
   `;
@@ -281,7 +322,7 @@ function renderTopBar(state) {
 function renderBattle(state) {
   return `
     <section class="battle-scene">
-      <div class="player-side combatant">
+      <div class="player-side combatant" data-combatant="player-0">
         <div class="combatant-frame player-frame">
           <div>
             <img class="portrait" src="./src/assets/player-placeholder.svg" alt="${state.player.name}" />
@@ -290,7 +331,7 @@ function renderBattle(state) {
         </div>
       </div>
       <div class="enemy-side">
-        ${state.enemies.map((enemy) => renderEnemy(enemy, state.selectedEnemyId)).join("")}
+        ${state.enemies.map((enemy, index) => renderEnemy(enemy, state.selectedEnemyId, index)).join("")}
       </div>
     </section>
     <section class="battle-controls">
@@ -319,10 +360,10 @@ function renderBattle(state) {
   `;
 }
 
-function renderEnemy(enemy, selectedEnemyId) {
+function renderEnemy(enemy, selectedEnemyId, index) {
   const selectedClass = enemy.id === selectedEnemyId ? "selected" : "";
   return `
-    <button class="combatant enemy-card ${selectedClass}" data-action="select-enemy" data-id="${enemy.id}">
+    <button class="combatant enemy-card ${selectedClass}" data-action="select-enemy" data-id="${enemy.id}" data-combatant="enemy-${index}">
       <div class="combatant-frame enemy-frame">
         <img class="portrait" src="./src/assets/enemy-placeholder.svg" alt="${enemy.name}" />
         ${renderIntent(enemy.intent)}
@@ -706,18 +747,21 @@ function startBattle(state, type) {
   addLog(state, `${describeEncounterHeadline(state)} appear.`);
 }
 
+// [FX] [SFX] playCard now returns { fx, sfx } so the caller (handleAction) can
+// fire them after re-render — no change to the public call signature.
 function playCard(state, index) {
   if (state.screen !== "battle" || state.outcome) {
-    return;
+    return null; // [FX]
   }
   const cardId = state.player.hand[index];
   const card = CARD_LIBRARY[cardId];
   if (!card || card.cost > state.player.energy) {
-    return;
+    return null; // [FX]
   }
 
   state.player.energy -= card.cost;
   state.player.hand.splice(index, 1);
+  const feedback = buildCardFeedback(card, state);
   triggerCardEvent(state, card, "onPlay", battleContext(state, card));
   triggerRelicEvent(state, "onCardPlayed", battleContext(state, card));
 
@@ -730,7 +774,11 @@ function playCard(state, index) {
   processDefeatedEnemies(state);
   if (state.enemies.length === 0) {
     winBattle(state);
+    // [SFX] victory sound queued by caller via sfx list
+    return { fx: feedback.fx, sfx: [...feedback.sfx, "victory"] };
   }
+
+  return feedback; // [FX] [SFX]
 }
 
 function selectEnemyTarget(state, enemyId) {
@@ -748,16 +796,16 @@ function selectEnemyTarget(state, enemyId) {
 
 function endTurn(state) {
   if (state.screen !== "battle" || state.outcome) {
-    return;
+    return null;
   }
 
   triggerRelicEvent(state, "onTurnEnd", battleContext(state));
   state.player.discardPile.push(...state.player.hand);
   state.player.hand = [];
-  runEnemyIntent(state);
+  const intentResult = runEnemyIntent(state);
   if (state.outcome === "defeat") {
     triggerRelicEvent(state, "onBattleEnd", { ...battleContext(state), result: "defeat" });
-    return;
+    return { fx: intentResult?.fx ?? [], sfx: [...(intentResult?.sfx ?? []), "defeat"] };
   }
 
   state.player.block = state.player.metallicize;
@@ -772,9 +820,15 @@ function endTurn(state) {
   for (const enemy of state.enemies) {
     addLog(state, `${enemy.name} prepares ${enemy.intent.label}.`);
   }
+
+  return intentResult ?? { fx: [], sfx: [] }; // [FX]
 }
 
+// [FX] runEnemyIntent now returns { fx, sfx } instead of void.
 function runEnemyIntent(state) {
+  const fxEvents = [];
+  const sfxList = [];
+
   for (const enemy of state.enemies) {
     const intent = enemy.intent;
     if (!intent) {
@@ -787,28 +841,38 @@ function runEnemyIntent(state) {
         const damage = adjustedDamage(intent.value + enemy.strength, enemy.weak, state.player.vulnerable);
         absorbDamage(state.player, damage);
         addLog(state, `${enemy.name} hits for ${damage}.`);
+        fxEvents.push({ type: "damage", target: "player:0", value: damage });
+        sfxList.push("enemyAttack");
         if (state.player.hp <= 0) {
           state.outcome = "defeat";
           state.screen = "map";
-          return;
+        return { fx: fxEvents, sfx: sfxList }; // [FX]
         }
       }
     }
 
     if (intent.type === "attackBlock" && intent.block) {
       enemy.block += intent.block;
+      fxEvents.push({ type: "block", target: getEnemyFxTarget(state, enemy.id), value: intent.block });
+      sfxList.push("block");
     }
     if (intent.type === "buff") {
       enemy.strength += intent.strength ?? 0;
       enemy.block += intent.block ?? 0;
       addLog(state, `${enemy.name} grows stronger.`);
+      fxEvents.push({ type: "buff", target: getEnemyFxTarget(state, enemy.id), label: intent.label });
+      sfxList.push("buff");
     }
     if (intent.type === "debuff") {
       state.player.weak += intent.weak ?? 0;
       state.player.vulnerable += intent.vulnerable ?? 0;
       addLog(state, `${enemy.name} curses your footing.`);
+      fxEvents.push({ type: "debuff", target: "player:0", label: intent.label });
+      sfxList.push("debuff");
     }
   }
+
+  return { fx: fxEvents, sfx: sfxList }; // [FX]
 }
 
 function winBattle(state) {
@@ -850,6 +914,132 @@ function completeCurrentNode(state) {
   }
   node.completed = true;
   unlockNextNode(state);
+}
+
+function buildCardFeedback(card, state) {
+  const feedback = {
+    fx: [],
+    sfx: ["cardPlay"],
+  };
+
+  for (const behavior of card.behaviors ?? []) {
+    if (behavior.trigger !== "onPlay") {
+      continue;
+    }
+
+    collectEffectFeedback(behavior.effects ?? [], state, feedback);
+  }
+
+  feedback.sfx = [...new Set(feedback.sfx)];
+  return feedback;
+}
+
+function collectEffectFeedback(effects, state, feedback) {
+  for (const effect of effects) {
+    if (!effect?.type) {
+      continue;
+    }
+
+    if (effect.type === "repeat") {
+      collectEffectFeedback(effect.effects ?? [], state, feedback);
+      continue;
+    }
+
+    if (effect.type === "condition") {
+      collectEffectFeedback(effect.effects ?? [], state, feedback);
+      collectEffectFeedback(effect.elseEffects ?? [], state, feedback);
+      continue;
+    }
+
+    if (effect.type === "damage") {
+      const targets = getFxTargetsForEffect(state, effect.target);
+      for (const target of targets) {
+        feedback.fx.push({ type: "damage", target, value: resolveFxValue(state, effect) });
+      }
+      feedback.sfx.push("attack");
+      continue;
+    }
+
+    if (effect.type === "heal") {
+      const targets = getFxTargetsForEffect(state, effect.target);
+      for (const target of targets) {
+        feedback.fx.push({ type: "heal", target, value: resolveFxValue(state, effect) });
+      }
+      feedback.sfx.push("heal");
+      continue;
+    }
+
+    if (effect.type === "modifyStat") {
+      const targets = getFxTargetsForEffect(state, effect.target);
+      const isDebuff = effect.stat === "weak" || effect.stat === "vulnerable";
+      const fxType = effect.stat === "block" ? "block" : isDebuff ? "debuff" : "buff";
+      for (const target of targets) {
+        feedback.fx.push({
+          type: fxType,
+          target,
+          value: fxType === "block" ? resolveFxValue(state, effect) : undefined,
+          label: fxType === "block" ? undefined : formatStatLabel(effect.stat, resolveFxValue(state, effect)),
+        });
+      }
+      feedback.sfx.push(fxType === "block" ? "block" : isDebuff ? "debuff" : "buff");
+      continue;
+    }
+
+    if (effect.type === "gainEnergy") {
+      feedback.sfx.push("buff");
+      continue;
+    }
+
+    if (effect.type === "drawCards") {
+      feedback.sfx.push("cardPlay");
+    }
+  }
+}
+
+function getFxTargetsForEffect(state, target) {
+  if (target === "self" || target === "owner" || target === "player") {
+    return ["player:0"];
+  }
+
+  if (target === "allEnemies") {
+    return state.enemies.map((enemy) => getEnemyFxTarget(state, enemy.id));
+  }
+
+  return [getEnemyFxTarget(state, state.selectedEnemyId)];
+}
+
+function getEnemyFxTarget(state, enemyId) {
+  const index = state.enemies.findIndex((enemy) => enemy.id === enemyId);
+  const fallbackIndex = state.enemies.findIndex((enemy) => enemy.hp > 0);
+  const resolvedIndex = index >= 0 ? index : Math.max(0, fallbackIndex);
+  return `enemy:${resolvedIndex}`;
+}
+
+function resolveFxValue(state, effect) {
+  if (typeof effect.amount === "number") {
+    if (effect.type === "damage" && effect.useCombatModifiers) {
+      const targetId = effect.target === "allEnemies" ? state.enemies[0]?.id : state.selectedEnemyId;
+      const target = state.enemies.find((enemy) => enemy.id === targetId) ?? state.enemies[0];
+      return adjustedDamage(
+        effect.amount + state.player.strength,
+        state.player.weak,
+        target?.vulnerable ?? 0,
+      );
+    }
+    return effect.amount;
+  }
+  if (effect.amount === "playerStrength") {
+    return state.player.strength;
+  }
+  if (effect.amount === "cardsInHand") {
+    return state.player.hand.length;
+  }
+  return 0;
+}
+
+function formatStatLabel(stat, amount) {
+  const readable = stat.replaceAll("_", " ");
+  return `${amount >= 0 ? "+" : ""}${amount} ${readable}`;
 }
 
 function adjustedDamage(amount, weak, targetVulnerable) {
