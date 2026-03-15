@@ -264,6 +264,23 @@ async function startNewGame() {
       throw new Error("Server did not return a lobby id.");
     }
 
+    // Ask the LLM to generate this run's content before connecting.
+    // On failure we fall back to static content gracefully.
+    try {
+      app.loadingMessage = "The oracle shapes your fate...";
+      render();
+      const genResult = await apiRequest(`/game/generate/${response.id}`, { method: "POST" });
+      if (genResult?.theme) {
+        app.loadingMessage = `Entering: ${genResult.theme}...`;
+        render();
+      }
+    } catch (genError) {
+      // Non-fatal: static content will be used
+      console.warn("LLM generation skipped:", genError?.message);
+      app.loadingMessage = "Connecting to spire...";
+      render();
+    }
+
     connectToGame(response.id);
   } catch (error) {
     app.error = errorMessage(error);

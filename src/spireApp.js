@@ -110,6 +110,16 @@ const MAP_TEMPLATE = [
   { id: "n6", type: "boss", label: "Boss" },
 ];
 
+// Look up a card definition from server-provided catalog or local fallback
+function getCardDef(cardId, state) {
+  return (state?.cardCatalog?.[cardId]) ?? CARD_LIBRARY[cardId] ?? null;
+}
+
+// Look up a relic definition from server-provided catalog or local fallback
+function getRelicDef(relicId, state) {
+  return (state?.relicCatalog?.[relicId]) ?? RELIC_LIBRARY[relicId] ?? null;
+}
+
 export function createGameRenderer(root, { onAction } = {}) {
   if (!root) {
     return null;
@@ -517,7 +527,7 @@ function renderEnemy(enemy, selectedEnemyId, index) {
 }
 
 function renderCard(cardId, state, index) {
-  const card = CARD_LIBRARY[cardId];
+  const card = getCardDef(cardId, state);
   const disabled = !card || state.player.energy < card.cost || state.outcome;
   const art = resolveCardArt(cardId, card);
   return `
@@ -720,8 +730,8 @@ function renderNonBattle(state) {
               ? `<p class="muted">No relics yet.</p>`
               : state.player.relics
                   .map((relicId) => {
-                    const relic = describeRelic(relicId);
-                    return `<p>${relic.icon} ${relic.name}</p>`;
+                    const relic = getRelicDef(relicId, state) ?? describeRelic(relicId);
+                    return relic ? `<p>${relic.icon} ${relic.name}</p>` : "";
                   })
                   .join("")
           }
@@ -784,7 +794,7 @@ function renderOverlay(state) {
           <p class="eyebrow">Reward</p>
           <h2>Choose a card</h2>
           <div class="reward-options">
-            ${state.rewardOptions.map((cardId) => renderRewardCard(cardId)).join("")}
+            ${state.rewardOptions.map((cardId) => renderRewardCard(cardId, state)).join("")}
           </div>
           <button class="button-muted" data-action="skip-reward">Skip reward</button>
         </div>
@@ -806,7 +816,7 @@ function renderOverlay(state) {
   }
 
   if (state.screen === "treasure") {
-    const relic = state.pendingRelicRewardId ? RELIC_LIBRARY[state.pendingRelicRewardId] : null;
+    const relic = state.pendingRelicRewardId ? getRelicDef(state.pendingRelicRewardId, state) : null;
     return `
       <div class="overlay">
         <div class="overlay-card">
@@ -835,8 +845,8 @@ function renderOverlay(state) {
   return "";
 }
 
-function renderRewardCard(cardId) {
-  const card = CARD_LIBRARY[cardId];
+function renderRewardCard(cardId, state) {
+  const card = getCardDef(cardId, state);
   const art = resolveCardArt(cardId, card);
   return `
     <button class="reward-option" data-action="claim-reward" data-id="${cardId}">

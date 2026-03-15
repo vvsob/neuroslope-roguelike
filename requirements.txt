@@ -1,1 +1,2 @@
 huggingface_hub>=0.24,<1
+google-generativeai>=0.8

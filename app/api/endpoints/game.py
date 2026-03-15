@@ -1,14 +1,17 @@
 import asyncio
 import copy
+import logging
 import random
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.api.dependencies import get_current_user
 from app.crud.game import GameCRUD
 from app.db.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/game", tags=["Game"])
 
@@ -471,14 +474,17 @@ MAP_TEMPLATE = [
 # ── Session management ────────────────────────────────────────────────────────
 
 class GameSession:
-    def __init__(self) -> None:
-        self.state: Dict[str, Any] = create_initial_state()
+    def __init__(self, generated_run: Optional[Dict[str, Any]] = None) -> None:
+        self.generated_run: Optional[Dict[str, Any]] = generated_run
+        self.state: Dict[str, Any] = create_initial_state(generated_run)
         self.connections: set[WebSocket] = set()
         self.lock = asyncio.Lock()
         self.rng = random.Random()
 
 
 games_state: Dict[int, GameSession] = {}
+# Stores pending generated run data before a WebSocket session is created
+pending_runs: Dict[int, Dict[str, Any]] = {}
 
 
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
@@ -498,12 +504,14 @@ async def websocket_endpoint(
 
     session = games_state.get(lobby_id)
     if session is None:
-        session = GameSession()
+        # Use LLM-generated run data if it was prepared in advance
+        generated_run = pending_runs.pop(lobby_id, None)
+        session = GameSession(generated_run=generated_run)
         games_state[lobby_id] = session
 
     session.connections.add(websocket)
 
-    await websocket.send_json({"type": "state", "state": copy.deepcopy(session.state)})
+    await websocket.send_json({"type": "state", "state": _public_state(session.state)})
 
     try:
         while True:
@@ -513,6 +521,56 @@ async def websocket_endpoint(
         pass
     finally:
         session.connections.discard(websocket)
+
+
+@router.post("/generate/{lobby_id}")
+async def generate_run_for_lobby(
+    lobby_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate LLM content for a lobby before the WebSocket session starts.
+    Call this after creating a new game (POST /lobby/new-game) and before
+    connecting the WebSocket. The generated run is stored in pending_runs
+    and picked up when the first WebSocket connection is made.
+
+    Returns: {"status": "ok", "theme": "...", "imageGenerationStarted": true/false}
+    """
+    from app.llm_gen import generate_run
+    from app.img_gen import generate_run_images
+
+    # Verify the user belongs to this lobby
+    game_user = await GameCRUD.get_game_user(game_id=lobby_id, user_id=current_user.id)
+    if not game_user:
+        raise HTTPException(status_code=403, detail="Not a member of this lobby.")
+
+    # If a session already exists and is running, we can't regenerate it
+    if lobby_id in games_state:
+        raise HTTPException(status_code=409, detail="Game session already started. Cannot regenerate.")
+
+    try:
+        loop = asyncio.get_running_loop()
+        generated_run = await loop.run_in_executor(None, generate_run)
+    except Exception as exc:
+        logger.error("LLM run generation failed for lobby %d: %s", lobby_id, exc)
+        raise HTTPException(status_code=502, detail=f"LLM generation failed: {exc}")
+
+    pending_runs[lobby_id] = generated_run
+
+    # Start image generation in the background (non-blocking)
+    image_prompts = generated_run.get("imagePrompts") or {}
+    img_started = bool(image_prompts)
+    if img_started:
+        asyncio.create_task(
+            generate_run_images(image_prompts),
+            name=f"imggen-lobby-{lobby_id}",
+        )
+
+    return {
+        "status": "ok",
+        "theme": generated_run.get("theme", ""),
+        "imageGenerationStarted": img_started,
+    }
 
 
 async def handle_client_message(session: GameSession, websocket: WebSocket, data: Dict[str, Any]) -> None:
@@ -526,7 +584,7 @@ async def handle_client_message(session: GameSession, websocket: WebSocket, data
         return
 
     if message_type == "get_state":
-        await websocket.send_json({"type": "state", "state": copy.deepcopy(session.state)})
+        await websocket.send_json({"type": "state", "state": _public_state(session.state)})
         return
 
     action = data.get("action")
@@ -546,7 +604,7 @@ async def handle_client_message(session: GameSession, websocket: WebSocket, data
             return
         payload = {
             "type": "state",
-            "state": copy.deepcopy(session.state),
+            "state": _public_state(session.state),
         }
         if result.get("fx"):
             payload["fx"] = result["fx"]
@@ -554,6 +612,39 @@ async def handle_client_message(session: GameSession, websocket: WebSocket, data
             payload["sfx"] = result["sfx"]
 
     await broadcast_state(session, payload)
+
+
+def _public_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Return a copy of game state ready for the client.
+    Strips internal keys and injects merged card/relic catalogs so the
+    frontend can render LLM-generated cards without extra API calls.
+    """
+    s = copy.deepcopy(state)
+    generated_run = s.pop("_generatedRun", None)
+
+    # Build merged catalogs: static + generated (generated takes precedence)
+    card_catalog: Dict[str, Any] = {}
+    for cid, cdef in CARD_LIBRARY.items():
+        card_catalog[cid] = {k: v for k, v in cdef.items() if k != "behaviors"}
+    if generated_run:
+        for cdef in (generated_run.get("cards") or []):
+            cid = cdef.get("id")
+            if cid:
+                card_catalog[cid] = {k: v for k, v in cdef.items() if k != "behaviors"}
+
+    relic_catalog: Dict[str, Any] = {}
+    for rid, rdef in RELIC_LIBRARY.items():
+        relic_catalog[rid] = {k: v for k, v in rdef.items() if k != "behaviors"}
+    if generated_run:
+        for rdef in (generated_run.get("relics") or []):
+            rid = rdef.get("id")
+            if rid:
+                relic_catalog[rid] = {k: v for k, v in rdef.items() if k != "behaviors"}
+
+    s["cardCatalog"] = card_catalog
+    s["relicCatalog"] = relic_catalog
+    return s
 
 
 async def broadcast_state(session: GameSession, payload: Dict[str, Any]) -> None:
@@ -570,11 +661,66 @@ async def broadcast_state(session: GameSession, payload: Dict[str, Any]) -> None
 # ── Game logic (ported from frontend) ────────────────────────────────────────
 
 
-def create_initial_state() -> Dict[str, Any]:
-    return {
-        "screen": "map",
-        "floor": 1,
-        "mapNodes": [
+def _get_level_art_for_run(node_id: str, generated_run: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return level art from the generated run if available, else static LEVEL_ART."""
+    if generated_run and generated_run.get("levelArt", {}).get(node_id):
+        return generated_run["levelArt"][node_id]
+    return get_level_art(node_id)
+
+
+def _get_encounters_for_run(battle_type: str, generated_run: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return encounter pool from the generated run if available, else static ENCOUNTERS."""
+    if generated_run and generated_run.get("encounters", {}).get(battle_type):
+        return generated_run["encounters"][battle_type]
+    return ENCOUNTERS[battle_type]
+
+
+def _get_card_reward_pool_for_run(deck: List[str], generated_run: Optional[Dict[str, Any]]) -> List[str]:
+    """
+    Return card IDs eligible for reward from the run's card pool.
+    LLM cards are injected into a temporary library for the session.
+    """
+    if generated_run and generated_run.get("cards"):
+        pool = [c["id"] for c in generated_run["cards"]]
+    else:
+        pool = list(CARD_REWARD_POOL)
+    return [cid for cid in pool if cid not in deck or len(deck) > 9]
+
+
+def _get_relic_pool_for_run(relics_held: List[str], generated_run: Optional[Dict[str, Any]]) -> List[str]:
+    """Return available relic IDs from the run's relic pool."""
+    if generated_run and generated_run.get("relics"):
+        pool = [r["id"] for r in generated_run["relics"]]
+    else:
+        pool = list(TREASURE_RELIC_POOL)
+    available = [r for r in pool if r not in relics_held]
+    return available if available else pool
+
+
+def _get_card_def(card_id: str, generated_run: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Look up a card definition, checking generated cards first."""
+    if generated_run:
+        for card in (generated_run.get("cards") or []):
+            if card.get("id") == card_id:
+                return card
+    return CARD_LIBRARY.get(card_id)
+
+
+def _get_relic_def(relic_id: str, generated_run: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Look up a relic definition, checking generated relics first."""
+    if generated_run:
+        for relic in (generated_run.get("relics") or []):
+            if relic.get("id") == relic_id:
+                return relic
+    return RELIC_LIBRARY.get(relic_id)
+
+
+def create_initial_state(generated_run: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    # Use LLM-generated map nodes if available, otherwise static template
+    if generated_run and generated_run.get("mapNodes"):
+        map_nodes = generated_run["mapNodes"]
+    else:
+        map_nodes = [
             {
                 **node,
                 "index": index,
@@ -582,7 +728,15 @@ def create_initial_state() -> Dict[str, Any]:
                 "available": index == 0,
             }
             for index, node in enumerate(MAP_TEMPLATE)
-        ],
+        ]
+
+    theme = (generated_run or {}).get("theme", "")
+    log_message = f"A new ascent begins — {theme}. Choose your route." if theme else "A new ascent begins. Choose your route."
+
+    return {
+        "screen": "map",
+        "floor": 1,
+        "mapNodes": map_nodes,
         "player": {
             "name": "Warden",
             "hp": 72,
@@ -605,11 +759,13 @@ def create_initial_state() -> Dict[str, Any]:
         "enemies": [],
         "selectedEnemyId": None,
         "rewardOptions": [],
-        "log": ["A new ascent begins. Choose your route."],
+        "log": [log_message],
         "battle": None,
         "outcome": None,
-        "loadout": get_level_art("n1"),
+        "loadout": _get_level_art_for_run("n1", generated_run),
         "cardAnimation": None,
+        # Internal: not sent to client (stripped in broadcast_state)
+        "_generatedRun": generated_run,
     }
 
 
@@ -650,7 +806,8 @@ def dispatch_action(session: GameSession, action: str, action_id: Optional[Any])
         take_relic(state)
         sfx = ["buff"]
     elif action == "restart":
-        session.state = create_initial_state()
+        # Keep the same generated run on restart so the theme stays consistent
+        session.state = create_initial_state(session.generated_run)
     elif action == "toggle-sfx":
         # Server does not manage client audio toggles.
         pass
@@ -698,7 +855,8 @@ def travel_to_node(state: Dict[str, Any], node_id: Optional[str], rng: random.Ra
     if not node or not node.get("available") or node.get("completed"):
         return
 
-    state["loadout"] = get_level_art(node["id"])
+    generated_run = state.get("_generatedRun")
+    state["loadout"] = _get_level_art_for_run(node["id"], generated_run)
     state["floor"] = node["index"] + 1
     add_log(state, f"You enter {node['label']}.")
 
@@ -715,9 +873,11 @@ def travel_to_node(state: Dict[str, Any], node_id: Optional[str], rng: random.Ra
 
 def start_battle(state: Dict[str, Any], node: Dict[str, Any], rng: random.Random) -> None:
     battle_type = node["type"]
-    template = clone_pick(ENCOUNTERS[battle_type], rng)
+    generated_run = state.get("_generatedRun")
+    encounter_pool = _get_encounters_for_run(battle_type, generated_run)
+    template = clone_pick(encounter_pool, rng)
     enemy_templates = template.get("enemies") or [template]
-    art = get_level_art(node["id"])
+    art = _get_level_art_for_run(node["id"], generated_run)
 
     enemies: List[Dict[str, Any]] = []
     for index, enemy_template in enumerate(enemy_templates):
@@ -768,7 +928,7 @@ def play_card(state: Dict[str, Any], index: int, rng: random.Random) -> Optional
         return None
 
     card_id = hand[index]
-    card = CARD_LIBRARY.get(card_id)
+    card = _get_card_def(card_id, state.get("_generatedRun"))
     if not card or card.get("cost", 0) > state["player"]["energy"]:
         return None
 
@@ -897,7 +1057,7 @@ def win_battle(state: Dict[str, Any], rng: random.Random) -> None:
     state["selectedEnemyId"] = None
     state["player"]["block"] = 0
     state["player"]["energy"] = state["player"]["maxEnergy"]
-    state["rewardOptions"] = pick_reward_cards(state["player"]["deck"], rng)
+    state["rewardOptions"] = pick_reward_cards(state["player"]["deck"], rng, state.get("_generatedRun"))
     state["screen"] = "map"
     state["mapNodes"][state["floor"] - 1]["completed"] = True
     unlock_next_node(state)
@@ -910,7 +1070,9 @@ def win_battle(state: Dict[str, Any], rng: random.Random) -> None:
 
 def claim_reward(state: Dict[str, Any], card_id: str) -> None:
     state["player"]["deck"].append(card_id)
-    add_log(state, f"You add {CARD_LIBRARY[card_id]['name']} to your deck.")
+    card_def = _get_card_def(card_id, state.get("_generatedRun"))
+    card_name = card_def["name"] if card_def else card_id
+    add_log(state, f"You add {card_name} to your deck.")
     state["rewardOptions"] = []
     state["screen"] = "map"
 
@@ -1103,26 +1265,28 @@ def draw_cards(state: Dict[str, Any], amount: int, rng: random.Random) -> None:
         next_card_id = state["player"]["drawPile"].pop() if state["player"]["drawPile"] else None
         if not next_card_id:
             continue
-        card = CARD_LIBRARY.get(next_card_id)
+        card = _get_card_def(next_card_id, state.get("_generatedRun"))
         state["player"]["hand"].append(next_card_id)
         if card:
             trigger_card_event(state, card, "onDraw", battle_context(state, rng, card))
             trigger_relic_event(state, "onCardDrawn", battle_context(state, rng, card))
 
 
-def pick_reward_cards(deck: List[str], rng: random.Random) -> List[str]:
-    pool = [card_id for card_id in CARD_REWARD_POOL if card_id not in deck or len(deck) > 9]
+def pick_reward_cards(deck: List[str], rng: random.Random, generated_run: Optional[Dict[str, Any]] = None) -> List[str]:
+    pool = _get_card_reward_pool_for_run(deck, generated_run)
     return shuffle(pool, rng)[:3]
 
 
 def pick_relic_reward(state: Dict[str, Any], rng: random.Random) -> str:
-    available = [relic_id for relic_id in TREASURE_RELIC_POOL if relic_id not in state["player"]["relics"]]
-    pool = available if available else TREASURE_RELIC_POOL
+    generated_run = state.get("_generatedRun")
+    pool = _get_relic_pool_for_run(state["player"]["relics"], generated_run)
+    if not pool:
+        pool = list(TREASURE_RELIC_POOL)
     return pool[rng.randrange(0, len(pool))]
 
 
 def grant_relic(state: Dict[str, Any], relic_id: str) -> None:
-    relic = RELIC_LIBRARY.get(relic_id)
+    relic = _get_relic_def(relic_id, state.get("_generatedRun"))
     if not relic:
         return
     if relic_id not in state["player"]["relics"]:
@@ -1181,8 +1345,9 @@ def clone_pick(items: List[Dict[str, Any]], rng: random.Random) -> Dict[str, Any
 
 def trigger_relic_event(state: Dict[str, Any], trigger: str, context: Optional[Dict[str, Any]] = None) -> None:
     context = context or {}
+    generated_run = state.get("_generatedRun")
     for relic_id in state["player"]["relics"]:
-        relic = RELIC_LIBRARY.get(relic_id)
+        relic = _get_relic_def(relic_id, generated_run)
         if not relic:
             continue
         run_behavior_set(state, relic.get("behaviors", []), trigger, {
