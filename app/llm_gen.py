@@ -94,24 +94,27 @@ def _call_gemini(prompt: str, retries: int = 3) -> str:
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """You are a game designer for a dark sci-fi roguelike card game (similar to Slay the Spire).
-Generate content for ONE full game run. The player starts with 72 HP and a basic deck
-(4× Strike deal 6 damage, 4× Defend give 5 block, 1× Bash deal 10+2vulnerable, 1× Focus draw+1 each turn).
-Max player energy per turn: 3.
+_SYSTEM_PROMPT = """Ты — гейм-дизайнер тёмной sci-fi рогалик карточной игры (в стиле Slay the Spire).
+Сгенерируй контент для ОДНОГО полного рана. Игрок начинает с 72 HP и базовой колодой
+(4× Удар — 6 урона, 4× Защита — 5 блока, 1× Дробление — 8 урона + 2 уязвимости, 1× Концентрация — +2 силы).
+Макс энергии за ход: 3.
+
+⚠️ ЯЗЫК: Все названия (карты, враги, реликвии, ноды, описания, label у интентов) — ТОЛЬКО НА РУССКОМ.
+ID карт и реликвий — snake_case латиницей (для технических нужд).
 
 ═══════════════════════════════════════
-BALANCE GUIDELINES
+БАЛАНС
 ═══════════════════════════════════════
-- Hallway enemies (n1, n2, n4): moderate threat, HP 28-55, attacks 5-12, max 2 enemies per encounter
-- Elite (n6): real challenge, HP 65-95, attacks 10-18, must have one unique mechanic (poison/heal/buff combo)
-- Boss (n8): HP 110-145, 4+ intents, escalating danger pattern, should feel EPIC
-- Card costs: 0-2 energy. Cost 2 = powerful. Cost 0 = very weak (cantrip).
-- Damage numbers: a 2-cost Attack dealing 20 is fine; 40+ is too strong.
-- Block numbers: 8-14 is typical for a 1-cost Skill.
-- Cards must have exactly ONE behavior with trigger "onPlay".
-- Relic effects: moderate per-trigger. No "+5 strength on every card played".
-- Enemy intents with type "poison" apply poison stack to the player (use "amount": 2-5).
-- Enemy intents with type "heal" restore HP to the enemy itself (use "amount": 10-25).
+- Коридорные враги (n1, n2, n4, n5, n9): умеренная угроза, HP 28-58, атаки 5-13, макс 2 врага в группе
+- Элита (n7, n10): серьёзный вызов, HP 65-100, атаки 10-20, уникальная механика (яд/лечение/усиление)
+- Босс (n12): HP 115-150, 4+ интентов, нарастающая опасность, должен быть ЭПИЧНЫМ
+- Стоимость карт: 0-2 энергии. 2 = мощная карта. 0 = очень слабая (кантрип).
+- Урон: атака за 2 энергии на 20 — нормально; 40+ — слишком много.
+- Блок: 8-14 типично для карты Навыка за 1 энергию.
+- У карт ровно ОДИН behavior с trigger "onPlay".
+- Реликвии: умеренный эффект за триггер.
+- Интент "poison" — накладывает яд на игрока (amount: 2-5).
+- Интент "heal" — враг восстанавливает себе HP (amount: 10-25).
 
 ═══════════════════════════════════════
 EFFECT REFERENCE (all available types)
@@ -225,109 +228,118 @@ EXAMPLE CARDS using advanced mechanics:
    ]}]}
 
 ═══════════════════════════════════════
-THEMATIC GUIDANCE
+ТЕМАТИКА
 ═══════════════════════════════════════
-- Invent ONE unique dark sci-fi theme for this run (e.g. "frozen reactor meltdown", "ghost ship graveyard", "neural parasite hive")
-- Derive a "worldStyle": a 15-25 word visual art direction string that ALL image prompts must share
-  Example: "dark industrial gothic, corroded iron and toxic green glow, painterly oil texture, dramatic underlighting, high contrast"
-- Every name, description, card name, enemy name, node label must feel thematically consistent
-- Each card should have a unique mechanical hook — avoid generating 6 plain "deal X damage" cards
+- Придумай ОДНУ уникальную тёмную sci-fi тему для рана (например: "Мутация реакторного ядра", "Кладбище призрачных кораблей", "Улей нейропаразитов")
+- Выведи "worldStyle": строку визуального стиля 15-25 слов, которую используют ВСЕ промпты изображений
+  Пример: "dark industrial gothic, corroded iron and toxic green glow, painterly oil texture, dramatic underlighting, high contrast"
+- Каждое название, описание, имя врага, метка ноды — тематически связаны и на русском
+- Каждая карта должна иметь уникальную механическую изюминку — не генерируй 8 одинаковых "нанести X урона"
 
 ═══════════════════════════════════════
-INTENT TYPES REFERENCE
+ТИПЫ ИНТЕНТОВ ВРАГОВ
 ═══════════════════════════════════════
-  attack      — {"type":"attack","value":10,"label":"Strike 10"}
-  attackBlock — {"type":"attackBlock","value":8,"block":6,"label":"Slash + Shield"}
-  buff        — {"type":"buff","strength":3,"label":"Power Up +3 STR"}  (or block)
-  debuff      — {"type":"debuff","weak":2,"label":"Weaken 2"}  (or vulnerable)
-  poison      — {"type":"poison","amount":4,"label":"Venom +4"}  — applies 4 poison to the player
-  heal        — {"type":"heal","amount":15,"label":"Regenerate 15"}  — enemy heals itself
+  attack      — {"type":"attack","value":10,"label":"Удар 10"}
+  attackBlock — {"type":"attackBlock","value":8,"block":6,"label":"Удар + Блок"}
+  buff        — {"type":"buff","strength":3,"label":"Усиление +3 Силы"}  (или block)
+  debuff      — {"type":"debuff","weak":2,"label":"Ослабление 2"}  (или vulnerable)
+  poison      — {"type":"poison","amount":4,"label":"Яд +4"}  — накладывает яд на игрока
+  heal        — {"type":"heal","amount":15,"label":"Регенерация 15"}  — враг лечит себя
 
 ═══════════════════════════════════════
-OUTPUT SCHEMA (return ONLY this JSON)
+СХЕМА ВЫВОДА (ТОЛЬКО этот JSON, ничего лишнего)
 ═══════════════════════════════════════
 
 {
-  "theme": "short thematic title (3-6 words)",
-  "worldStyle": "shared visual style for ALL art in this run (15-25 words, NO photorealistic, NO 3D render — use painterly/oil painting/hand-drawn style)",
+  "theme": "короткое название темы (3-6 слов, по-русски)",
+  "worldStyle": "общий визуальный стиль для ВСЕХ изображений (15-25 слов на английском, НЕ photorealistic, НЕ 3D — только painterly/oil painting/hand-drawn)",
   "encounters": {
     "hallway": [
-      {"enemies": [{"name":"string","description":"1 sentence flavour","maxHp":28-55,"intents":[
-        {"type":"attack|buff|attackBlock|debuff|poison","value":number_if_attack,"label":"string",
-         "strength":optional,"block":optional,"weak":optional,"vulnerable":optional,"amount":optional,"repeats":optional}
+      {"enemies": [{"name":"строка по-русски","description":"1 предложение-флавор по-русски","maxHp":28-58,"intents":[
+        {"type":"attack|buff|attackBlock|debuff|poison","value":число_если_атака,"label":"по-русски",
+         "strength":опционально,"block":опционально,"weak":опционально,"vulnerable":опционально,"amount":опционально,"repeats":опционально}
       ]}]},
-      {"enemies": [/* variant 2, can be 2 enemies */]},
-      {"enemies": [/* variant 3 */]},
-      {"enemies": [/* variant 4 */]}
+      {"enemies": [/* вариант 2, можно 2 врага */]},
+      {"enemies": [/* вариант 3 */]},
+      {"enemies": [/* вариант 4 */]},
+      {"enemies": [/* вариант 5 */]}
     ],
     "elite": [
-      {"enemies": [{"name":"string","description":"1 sentence flavour","maxHp":65-95,"intents":[/* 3-4 intents, must include poison OR heal OR buff */]}]},
-      {"enemies": [/* variant 2 */]}
+      {"enemies": [{"name":"по-русски","description":"1 предложение по-русски","maxHp":65-100,"intents":[/* 3-4 интента, обязательно яд ИЛИ лечение ИЛИ усиление */]}]},
+      {"enemies": [/* вариант 2 */]}
     ],
-    "boss":  [{"enemies": [{"name":"string","description":"1 sentence boss lore","maxHp":110-145,"intents":[/* 4-5 intents, use poison+heal+attack combo */]}]}]
+    "boss": [{"enemies": [{"name":"по-русски","description":"лор босса по-русски","maxHp":115-150,"intents":[/* 4-5 интентов, комбо яд+лечение+атака */]}]}]
   },
   "cards": [
     {
-      "id": "unique_snake_case_id",
-      "name": "Card Name",
+      "id": "snake_case_latin_id",
+      "name": "Название на русском",
       "cost": 0-2,
       "type": "Attack|Skill|Power",
       "rarity": "Common|Uncommon|Rare",
-      "description": "Short effect description (1-2 sentences).",
-      "behaviors": [{"trigger":"onPlay","effects":[/* 1-4 effects from the reference above */]}]
+      "description": "Короткое описание эффекта на русском (1-2 предложения).",
+      "behaviors": [{"trigger":"onPlay","effects":[/* 1-4 эффекта из справочника выше */]}]
     }
   ],
   "relics": [
     {
-      "id": "unique_snake_case_id",
-      "name": "Relic Name",
-      "icon": "single emoji",
-      "description": "Passive effect description.",
+      "id": "snake_case_latin_id",
+      "name": "Название реликвии на русском",
+      "icon": "одно эмодзи",
+      "description": "Описание пассивного эффекта на русском.",
       "behaviors": [{"trigger":"onBattleStart|onCardPlayed|onTurnStart|onTurnEnd|onBattleEnd",
-                     "effects":[/* 1-2 effects */]}]
+                     "effects":[/* 1-2 эффекта */]}]
     }
   ],
   "levelArt": {
-    "n1": {"title":"Floor 1","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[0].enemies[0].name","enemyDescription":"1 sentence"},
-    "n2": {"title":"Floor 2","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[1] first enemy","enemyDescription":"1 sentence"},
-    "n3": {"title":"Floor 3 — Rest","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"A moment of quiet."},
-    "n4": {"title":"Floor 4","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[2] or hallway[3] first enemy","enemyDescription":"1 sentence"},
-    "n5": {"title":"Floor 5 — Cache","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"A hidden cache of relics."},
-    "n6": {"title":"Floor 6 — Elite","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches elite[0] enemy name","enemyDescription":"1 sentence"},
-    "n7": {"title":"Floor 7 — Rest","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"Final rest before the summit."},
-    "n8": {"title":"Floor 8 — Boss","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches boss enemy name","enemyDescription":"1 sentence"}
+    "n1":  {"title":"Этаж 1","weaponName":"по-русски","weaponDescription":"1 предложение по-русски","enemyName":"совпадает с hallway[0].enemies[0].name","enemyDescription":"1 предложение по-русски"},
+    "n2":  {"title":"Этаж 2","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"hallway[1] первый враг","enemyDescription":"1 предложение"},
+    "n3":  {"title":"Этаж 3 — Привал","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"нет","enemyDescription":"Момент тишины."},
+    "n4":  {"title":"Этаж 4","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"hallway[2] первый враг","enemyDescription":"1 предложение"},
+    "n5":  {"title":"Этаж 5","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"hallway[3] первый враг","enemyDescription":"1 предложение"},
+    "n6":  {"title":"Этаж 6 — Тайник","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"нет","enemyDescription":"Скрытый запас реликвий."},
+    "n7":  {"title":"Этаж 7 — Элита","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"elite[0] имя врага","enemyDescription":"1 предложение"},
+    "n8":  {"title":"Этаж 8 — Привал","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"нет","enemyDescription":"Последний отдых перед вершиной."},
+    "n9":  {"title":"Этаж 9","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"hallway[4] первый враг","enemyDescription":"1 предложение"},
+    "n10": {"title":"Этаж 10 — Элита","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"elite[1] имя врага","enemyDescription":"1 предложение"},
+    "n11": {"title":"Этаж 11 — Привал","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"нет","enemyDescription":"Финальный привал."},
+    "n12": {"title":"Этаж 12 — Босс","weaponName":"по-русски","weaponDescription":"1 предложение","enemyName":"имя босса","enemyDescription":"1 предложение по-русски"}
   },
   "mapNodes": [
-    {"id":"n1","type":"hallway","label":"string"},
-    {"id":"n2","type":"hallway","label":"string"},
-    {"id":"n3","type":"campfire","label":"string"},
-    {"id":"n4","type":"hallway","label":"string"},
-    {"id":"n5","type":"treasure","label":"string"},
-    {"id":"n6","type":"elite","label":"string"},
-    {"id":"n7","type":"campfire","label":"string"},
-    {"id":"n8","type":"boss","label":"string"}
+    {"id":"n1", "type":"hallway",  "label":"по-русски"},
+    {"id":"n2", "type":"hallway",  "label":"по-русски"},
+    {"id":"n3", "type":"campfire", "label":"по-русски"},
+    {"id":"n4", "type":"hallway",  "label":"по-русски"},
+    {"id":"n5", "type":"hallway",  "label":"по-русски"},
+    {"id":"n6", "type":"treasure", "label":"по-русски"},
+    {"id":"n7", "type":"elite",    "label":"по-русски"},
+    {"id":"n8", "type":"campfire", "label":"по-русски"},
+    {"id":"n9", "type":"hallway",  "label":"по-русски"},
+    {"id":"n10","type":"elite",    "label":"по-русски"},
+    {"id":"n11","type":"campfire", "label":"по-русски"},
+    {"id":"n12","type":"boss",     "label":"по-русски"}
   ],
   "imagePrompts": {
-    "n1": {
-      "weapon": "image prompt that BEGINS with worldStyle, then describes the weapon — painterly, hand-drawn, no plastic look",
-      "enemy": "image prompt that BEGINS with worldStyle, then describes the enemy — oil painting style, dramatic lighting"
-    },
-    "n2": {"weapon":"...","enemy":"..."},
-    "n4": {"weapon":"...","enemy":"..."},
-    "n6": {"weapon":"...","enemy":"..."},
-    "n8": {"weapon":"...","enemy":"..."}
+    "n1":  {"weapon":"промпт НАЧИНАЕТСЯ с worldStyle, затем описание оружия — painterly, hand-drawn","enemy":"промпт НАЧИНАЕТСЯ с worldStyle, затем описание врага — oil painting, dramatic lighting"},
+    "n2":  {"weapon":"...","enemy":"..."},
+    "n4":  {"weapon":"...","enemy":"..."},
+    "n5":  {"weapon":"...","enemy":"..."},
+    "n7":  {"weapon":"...","enemy":"..."},
+    "n9":  {"weapon":"...","enemy":"..."},
+    "n10": {"weapon":"...","enemy":"..."},
+    "n12": {"weapon":"...","enemy":"..."}
   }
 }
 
-STRICT RULES:
-- Exactly 4 hallway variants, 2 elite variants, 1 boss
-- Exactly 8 cards — at least 3 must use advanced effects (multiHit/splitDamage/lifesteal/execute/echo/condition/dynamic amounts)
-- Exactly 3 relics
-- Every intent needs a "label"
-- Attack intents need "value"; buff/debuff use strength/block/weak/vulnerable; poison/heal use "amount"
-- Image prompts: each one starts with worldStyle verbatim, then adds subject-specific details
-- worldStyle MUST mention "painterly" or "oil painting" or "hand-drawn" — never "photorealistic" or "3D"
-- No markdown, no explanation — pure JSON only"""
+СТРОГИЕ ПРАВИЛА:
+- Ровно 5 вариантов hallway, 2 варианта elite, 1 boss
+- Ровно 10 карт — минимум 4 используют продвинутые эффекты (multiHit/splitDamage/lifesteal/execute/echo/condition/динамические amount)
+- Ровно 4 реликвии
+- У каждого интента есть "label" на русском
+- Атакующие интенты имеют "value"; buff/debuff используют strength/block/weak/vulnerable; poison/heal используют "amount"
+- Промпты изображений: каждый начинается с worldStyle дословно, затем специфика субъекта
+- worldStyle ОБЯЗАТЕЛЬНО содержит "painterly" или "oil painting" или "hand-drawn" — никогда "photorealistic" или "3D"
+- Никакого markdown, никаких пояснений — только чистый JSON"""
 
 
 # ── Validation ────────────────────────────────────────────────────────────────
@@ -413,7 +425,7 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
     # Encounters
     hallway_raw = enc.get("hallway") or []
     hallway = []
-    for h in hallway_raw[:4]:
+    for h in hallway_raw[:5]:
         enemies = [_validate_enemy(e, (28, 55)) for e in (h.get("enemies") or [])]
         if enemies:
             hallway.append({"enemies": enemies})
@@ -442,16 +454,16 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Cards
     cards_raw = data.get("cards") or []
-    cards = [_validate_card(c) for c in cards_raw[:8]]
+    cards = [_validate_card(c) for c in cards_raw[:10]]
 
     # Relics
     relics_raw = data.get("relics") or []
-    relics = [_validate_relic(r) for r in relics_raw[:3]]
+    relics = [_validate_relic(r) for r in relics_raw[:4]]
 
-    # Level art — now 8 nodes
+    # Level art — 12 nodes
     level_art_raw = data.get("levelArt") or {}
     level_art: Dict[str, Any] = {}
-    for node_id in ("n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8"):
+    for node_id in ("n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8", "n9", "n10", "n11", "n12"):
         raw = level_art_raw.get(node_id) or {}
         level_art[node_id] = {
             "title": str(raw.get("title", f"Floor {node_id[1:]}")),
@@ -463,12 +475,13 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
             "enemyImage": f"./src/assets/generated/run/{node_id}-enemy.png",
         }
 
-    # Map nodes — 8 nodes
+    # Map nodes — 12 nodes
     map_nodes_raw = data.get("mapNodes") or []
     node_types = {
         "n1": "hallway", "n2": "hallway", "n3": "campfire",
-        "n4": "hallway", "n5": "treasure", "n6": "elite",
-        "n7": "campfire", "n8": "boss",
+        "n4": "hallway", "n5": "hallway", "n6": "treasure",
+        "n7": "elite",   "n8": "campfire", "n9": "hallway",
+        "n10": "elite",  "n11": "campfire", "n12": "boss",
     }
     map_nodes = []
     node_map = {n["id"]: n for n in map_nodes_raw if isinstance(n, dict)}
@@ -489,7 +502,7 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
     # Image prompts — prepend worldStyle if not already present
     image_prompts = {}
     raw_prompts = data.get("imagePrompts") or {}
-    for node_id in ("n1", "n2", "n4", "n6", "n8"):
+    for node_id in ("n1", "n2", "n4", "n5", "n7", "n9", "n10", "n12"):
         node_prompts = raw_prompts.get(node_id) or {}
         weapon_prompt = str(node_prompts.get("weapon", ""))[:500]
         enemy_prompt = str(node_prompts.get("enemy", ""))[:500]
