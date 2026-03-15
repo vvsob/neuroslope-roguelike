@@ -156,8 +156,8 @@ export function createGameRenderer(root, { onAction } = {}) {
       root.innerHTML = `
         <div class="boot-card">
           <p class="eyebrow">Neuroslope</p>
-          <h1>Connecting...</h1>
-          <p class="muted">Waiting for the spire to respond.</p>
+          <h1>Подключение...</h1>
+          <p class="muted">Ожидание ответа башни.</p>
         </div>
       `;
       return;
@@ -296,7 +296,7 @@ export function mountApp(root) {
     if (action === "rest") {
       setState((draft) => {
         draft.player.hp = Math.min(draft.player.maxHp, draft.player.hp + 16);
-        addLog(draft, "You rest at the fire and recover 16 HP.");
+        addLog(draft, "Ты отдыхаешь у костра и восстанавливаешь 16 HP.");
         completeCurrentNode(draft);
         draft.screen = "map";
       });
@@ -380,7 +380,7 @@ function createInitialState() {
     enemies: [],
     selectedEnemyId: null,
     rewardOptions: [],
-    log: ["A new ascent begins. Choose your route."],
+    log: ["Новый подъём начинается. Выбери маршрут."],
     battle: null,
     outcome: null,
     loadout: getLevelArt("n1"),
@@ -408,8 +408,8 @@ function renderNode(node, state) {
     <button class="node-card ${isNext ? "active" : ""}" data-action="travel" data-id="${node.id}" ${disabled ? "disabled" : ""}>
       <span class="node-icon">${nodeGlyph(node.type)}</span>
       <strong>${node.label}</strong>
-      <p class="muted">Floor ${node.index + 1}</p>
-      <p>${node.completed ? "Cleared" : node.available ? "Available" : "Locked"}</p>
+      <p class="muted">Этаж ${node.index + 1}</p>
+      <p>${node.completed ? "Пройдено" : node.available ? "Доступно" : "Закрыто"}</p>
     </button>
   `;
 }
@@ -418,21 +418,21 @@ function renderTopBar(state) {
   return `
     <section class="top-bar">
       <div class="top-pill">
-        <p class="eyebrow">Run</p>
-        <h3>Neuroslope Spire</h3>
-        <p class="muted">Floor ${state.floor} | ${state.screen === "battle" ? "In combat" : "Planning route"}</p>
+        <p class="eyebrow">Ран</p>
+        <h3>Neuroslope Башня</h3>
+        <p class="muted">Этаж ${state.floor} | ${state.screen === "battle" ? "В бою" : "Выбор пути"}</p>
       </div>
       <div class="top-pill">
         <p class="eyebrow">${state.player.name}</p>
         <h3>HP ${state.player.hp}/${state.player.maxHp}</h3>
-        <p class="muted">Energy ${state.player.energy}/${state.player.maxEnergy} | Relics ${state.player.relics.length}</p>
+        <p class="muted">Энергия ${state.player.energy}/${state.player.maxEnergy} | Реликвии ${state.player.relics.length}</p>
       </div>
       <div class="top-pill">
-        <p class="eyebrow">Encounter</p>
+        <p class="eyebrow">Встреча</p>
         <h3>${describeEncounterHeadline(state)}</h3>
-        <p class="muted">${state.enemies.length > 0 ? "Battle in progress" : "Choose the next room on the map."}</p>
+        <p class="muted">${state.enemies.length > 0 ? "Бой в процессе" : "Выберите следующую комнату."}</p>
         <button class="button-muted topbar-toggle" data-action="toggle-sfx">
-          ${SFX.enabled ? "🔊 Sound on" : "🔇 Sound off"}
+          ${SFX.enabled ? "🔊 Звук вкл" : "🔇 Звук выкл"}
         </button>
       </div>
     </section>
@@ -465,15 +465,15 @@ function renderBattle(state) {
           </div>
         </div>
         <div class="battle-sidepanel">
-          <p class="eyebrow">Turn</p>
+          <p class="eyebrow">Ход</p>
           <div class="turn-energy">
-            <h3>Energy ${state.player.energy}/${state.player.maxEnergy}</h3>
-            <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
+            <h3>Энергия ${state.player.energy}/${state.player.maxEnergy}</h3>
+            <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Текущая энергия">
               <span>${state.player.energy}</span>
             </div>
           </div>
-          <p class="muted">Hand ${state.player.hand.length}</p>
-          <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
+          <p class="muted">Рука: ${state.player.hand.length}</p>
+          <button class="button-primary end-turn-button" data-action="end-turn">Завершить ход</button>
         </div>
       </section>
     </section>
@@ -519,7 +519,7 @@ function renderEnemy(enemy, selectedEnemyId, index) {
           />
           ${renderIntent(enemy.intent)}
         </div>
-        <div class="enemy-nameplate">${enemy.name}</div>
+        <div class="enemy-nameplate" ${enemy.description ? `title="${enemy.description}"` : ""}>${enemy.name}</div>
         ${renderCombatFooter(enemy, "enemy")}
       </div>
     </button>
@@ -548,7 +548,7 @@ function renderCard(cardId, state, index) {
         <h3>${card.name}</h3>
         <p class="card-description">${card.description}</p>
       </div>
-      <p class="card-foot">${hasKeyword(card, "exhaust") ? "Exhausts after play" : card.rarity}</p>
+      <p class="card-foot">${hasKeyword(card, "exhaust") ? "Исчезает после игры" : card.rarity}</p>
     </button>
   `;
 }
@@ -600,7 +600,7 @@ function renderHpBar(current, max, variant) {
 function renderEffects(unit) {
   const effects = collectEffects(unit);
   if (effects.length === 0) {
-    return `<div class="effects-row empty"><span class="muted">No active effects</span></div>`;
+    return `<div class="effects-row empty"><span class="muted">Эффектов нет</span></div>`;
   }
 
   return `
@@ -621,11 +621,12 @@ function renderEffects(unit) {
 
 function collectEffects(unit) {
   const effectMap = [
-    { key: "block", icon: "B", name: "Block", describe: (value) => `Prevents the next ${value} damage taken this turn.` },
-    { key: "strength", icon: "S", name: "Strength", describe: (value) => `Adds ${value} damage to attacks.` },
-    { key: "weak", icon: "W", name: "Weak", describe: (value) => `Attacks deal reduced damage for ${value} more turns.` },
-    { key: "vulnerable", icon: "V", name: "Vulnerable", describe: (value) => `Incoming attacks deal extra damage for ${value} more turns.` },
-    { key: "metallicize", icon: "M", name: "Metallicize", describe: (value) => `Gain ${value} block at the start of each turn.` },
+    { key: "block", icon: "B", name: "Блок", describe: (value) => `Предотвращает следующие ${value} урона в этом ходу.` },
+    { key: "strength", icon: "S", name: "Сила", describe: (value) => `Добавляет ${value} урона к атакам.` },
+    { key: "weak", icon: "W", name: "Слабость", describe: (value) => `Атаки наносят меньше урона ещё ${value} ходов.` },
+    { key: "vulnerable", icon: "V", name: "Уязвимость", describe: (value) => `Входящие атаки наносят больше урона ещё ${value} ходов.` },
+    { key: "metallicize", icon: "M", name: "Металлизация", describe: (value) => `Получаете ${value} блока в начале каждого хода.` },
+    { key: "poison", icon: "☠", name: "Яд", describe: (value) => `Получаете ${value} урона от яда в конце каждого хода.` },
   ];
 
   return effectMap
@@ -640,62 +641,80 @@ function collectEffects(unit) {
 
 function describeIntent(intent) {
   if (!intent) {
-    return { icon: "?", name: "Unknown Intent", count: "", description: "The enemy's next action is unclear." };
+    return { icon: "?", name: "Неизвестно", count: "", description: "Намерение врага непонятно." };
   }
   if (intent.type === "attack") {
     const repeats = intent.repeats ?? 1;
     return {
       icon: repeats > 1 ? "⚔" : "🗡",
-      name: "Attack",
+      name: "Атака",
       count: repeats > 1 ? `${intent.value}x${repeats}` : `${intent.value}`,
-      description: repeats > 1 ? `Will attack ${repeats} times for ${intent.value} base damage each.` : `Will attack for ${intent.value} base damage.`,
+      description: repeats > 1 ? `Атакует ${repeats} раза по ${intent.value} урона.` : `Атакует на ${intent.value} урона.`,
     };
   }
   if (intent.type === "attackBlock") {
     return {
       icon: "🛡",
-      name: "Attack and Block",
+      name: "Атака и блок",
       count: `${intent.value}`,
-      description: `Will attack for ${intent.value} base damage and gain ${intent.block} block.`,
+      description: `Атакует на ${intent.value} и получает ${intent.block} блока.`,
     };
   }
   if (intent.type === "buff") {
     return {
       icon: "▲",
-      name: "Buff",
+      name: "Усиление",
       count: `+${intent.strength ?? intent.block ?? 0}`,
-      description: `Will gain ${intent.strength ?? 0} Strength and ${intent.block ?? 0} block.`,
+      description: `Получает ${intent.strength ?? 0} силы и ${intent.block ?? 0} блока.`,
     };
   }
   if (intent.type === "debuff") {
     return {
-      icon: "☠",
-      name: "Debuff",
+      icon: "⬇",
+      name: "Ослабление",
       count: `${Math.max(intent.weak ?? 0, intent.vulnerable ?? 0)}`,
-      description: `Will apply ${intent.weak ?? 0} Weak and ${intent.vulnerable ?? 0} Vulnerable.`,
+      description: `Накладывает ${intent.weak ?? 0} слабости и ${intent.vulnerable ?? 0} уязвимости.`,
     };
   }
-  return { icon: "?", name: intent.label, count: "", description: "The enemy is preparing something unusual." };
+  if (intent.type === "poison") {
+    const amount = intent.amount ?? 3;
+    return {
+      icon: "☠",
+      name: "Яд",
+      count: `+${amount}`,
+      description: `Отравляет тебя на ${amount}.`,
+    };
+  }
+  if (intent.type === "heal") {
+    const amount = intent.amount ?? 10;
+    return {
+      icon: "♥",
+      name: "Лечение",
+      count: `+${amount}`,
+      description: `Восстанавливает себе ${amount} HP.`,
+    };
+  }
+  return { icon: "?", name: intent.label ?? "Особое", count: "", description: "Враг готовит нечто необычное." };
 }
 
 function describeEncounterHeadline(state) {
   if (state.enemies.length === 0) {
-    return "No active enemy";
+    return "Нет врагов";
   }
   if (state.enemies.length === 1) {
     return state.enemies[0].name;
   }
-  return `${state.enemies.length} Enemies`;
+  return `${state.enemies.length} врага`;
 }
 
 function renderNonBattle(state) {
   if (state.outcome === "victory") {
     return `
       <section class="overlay-card">
-        <p class="eyebrow">Run complete</p>
-        <h2>You toppled the Neurolith</h2>
-        <p>The prototype run is complete. Restart to climb again.</p>
-        <button class="button-primary" data-action="restart">Start New Run</button>
+        <p class="eyebrow">Ран завершён</p>
+        <h2>Нейролит повержен</h2>
+        <p>Башня покорена. Начни новый забег.</p>
+        <button class="button-primary" data-action="restart">Новый ран</button>
       </section>
     `;
   }
@@ -705,7 +724,7 @@ function renderNonBattle(state) {
       <div class="map-panel">
         <div class="map-head">
           <div>
-            <p class="eyebrow">Run Map</p>
+            <p class="eyebrow">Карта рана</p>
             <h2>${describeScreen(state)}</h2>
           </div>
           <p class="muted">${describeHint(state)}</p>
@@ -716,18 +735,18 @@ function renderNonBattle(state) {
       </div>
       <div class="route-info-grid">
         <div class="control-card">
-          <p class="eyebrow">Adventurer</p>
+          <p class="eyebrow">Искатель</p>
           <h3>${state.player.name}</h3>
           <p>HP ${state.player.hp}/${state.player.maxHp}</p>
-          <p>Energy ${state.player.maxEnergy}</p>
-          <p>Deck ${state.player.deck.length} cards</p>
-          <p>Relics ${state.player.relics.length}</p>
+          <p>Энергия ${state.player.maxEnergy}</p>
+          <p>Колода: ${state.player.deck.length} карт</p>
+          <p>Реликвии: ${state.player.relics.length}</p>
         </div>
         <div class="control-card">
-          <p class="eyebrow">Relics</p>
+          <p class="eyebrow">Реликвии</p>
           ${
             state.player.relics.length === 0
-              ? `<p class="muted">No relics yet.</p>`
+              ? `<p class="muted">Пока нет реликвий.</p>`
               : state.player.relics
                   .map((relicId) => {
                     const relic = getRelicDef(relicId, state) ?? describeRelic(relicId);
@@ -754,10 +773,10 @@ function renderNonBattle(state) {
             />
           </div>
           <p>${state.loadout.enemyDescription}</p>
-          <p class="muted">Weapon: ${state.loadout.weaponName}</p>
+          <p class="muted">Оружие: ${state.loadout.weaponName}</p>
         </div>
         <div class="control-card">
-          <p class="eyebrow">Recent Log</p>
+          <p class="eyebrow">Журнал</p>
           <div class="log-list">
             ${state.log.slice(0, 8).map((entry) => `<p class="log-entry">${entry}</p>`).join("")}
           </div>
@@ -771,15 +790,15 @@ function renderDeckStrip(state) {
   return `
     <section class="deck-strip">
       <div class="stat-card">
-        <p class="eyebrow">Draw</p>
+        <p class="eyebrow">Колода</p>
         <h3>${state.player.drawPile.length}</h3>
       </div>
       <div class="stat-card">
-        <p class="eyebrow">Discard</p>
+        <p class="eyebrow">Сброс</p>
         <h3>${state.player.discardPile.length}</h3>
       </div>
       <div class="stat-card">
-        <p class="eyebrow">Exhaust</p>
+        <p class="eyebrow">Изгнание</p>
         <h3>${state.player.exhaustPile.length}</h3>
       </div>
     </section>
@@ -791,12 +810,12 @@ function renderOverlay(state) {
     return `
       <div class="overlay">
         <div class="overlay-card">
-          <p class="eyebrow">Reward</p>
-          <h2>Choose a card</h2>
+          <p class="eyebrow">Награда</p>
+          <h2>Выбери карту</h2>
           <div class="reward-options">
             ${state.rewardOptions.map((cardId) => renderRewardCard(cardId, state)).join("")}
           </div>
-          <button class="button-muted" data-action="skip-reward">Skip reward</button>
+          <button class="button-muted" data-action="skip-reward">Пропустить</button>
         </div>
       </div>
     `;
@@ -806,10 +825,10 @@ function renderOverlay(state) {
     return `
       <div class="overlay">
         <div class="overlay-card">
-          <p class="eyebrow">Campfire</p>
-          <h2>Rest or move on</h2>
-          <p>You may recover 16 HP before continuing.</p>
-          <button class="button-primary" data-action="rest">Rest</button>
+          <p class="eyebrow">Привал</p>
+          <h2>Отдохнуть или двигаться дальше</h2>
+          <p>Ты можешь восстановить 16 HP перед продолжением.</p>
+          <button class="button-primary" data-action="rest">Отдохнуть</button>
         </div>
       </div>
     `;
@@ -821,9 +840,9 @@ function renderOverlay(state) {
       <div class="overlay">
         <div class="overlay-card">
           <p class="eyebrow">Treasure</p>
-          <h2>${relic?.name ?? "Relic"}</h2>
-          <p>${relic?.description ?? "A strange treasure hums in the dark."}</p>
-          <button class="button-primary" data-action="take-relic">Take relic</button>
+          <h2>${relic?.name ?? "Реликвия"}</h2>
+          <p>${relic?.description ?? "Странная находка мерцает в темноте."}</p>
+          <button class="button-primary" data-action="take-relic">Взять реликвию</button>
         </div>
       </div>
     `;
@@ -833,10 +852,10 @@ function renderOverlay(state) {
     return `
       <div class="overlay">
         <div class="overlay-card">
-          <p class="eyebrow">Defeat</p>
-          <h2>The climb ends here</h2>
-          <p>Your deck was not enough this time.</p>
-          <button class="button-primary" data-action="restart">Try another run</button>
+          <p class="eyebrow">Поражение</p>
+          <h2>Подъём закончен</h2>
+          <p>На этот раз колода не выдержала.</p>
+          <button class="button-primary" data-action="restart">Попробовать снова</button>
         </div>
       </div>
     `;
@@ -861,7 +880,7 @@ function renderRewardCard(cardId, state) {
       </div>
       <h3>${card.name}</h3>
       <p>${card.description}</p>
-      <p class="muted">Cost ${card.cost}</p>
+      <p class="muted">Стоимость: ${card.cost}</p>
     </button>
   `;
 }
@@ -887,21 +906,21 @@ function resolveCardArt(cardId, card, state) {
 
 function describeScreen(state) {
   if (state.outcome === "defeat") {
-    return "Run failed";
+    return "Ран провален";
   }
   const nextNode = state.mapNodes.find((node) => node.available && !node.completed);
-  return nextNode ? `Next stop: ${nextNode.label}` : "The path is clear";
+  return nextNode ? `Следующая: ${nextNode.label}` : "Путь свободен";
 }
 
 function describeHint(state) {
   const nextNode = state.mapNodes.find((node) => node.available && !node.completed);
   if (!nextNode) {
-    return "The prototype run is complete.";
+    return "Ран завершён.";
   }
   if (nextNode.type === "boss") {
-    return "One final battle waits at the top.";
+    return "Финальный бой ждёт тебя наверху.";
   }
-  return "Pick the highlighted node to continue climbing.";
+  return "Нажми на выделенный узел, чтобы продолжить подъём.";
 }
 
 function travelToNode(state, id) {
@@ -912,7 +931,7 @@ function travelToNode(state, id) {
 
   state.loadout = getLevelArt(node.id);
   state.floor = node.index + 1;
-  addLog(state, `You enter ${node.label}.`);
+  addLog(state, `Ты входишь в: ${node.label}.`);
 
   if (node.type === "hallway" || node.type === "elite" || node.type === "boss") {
     startBattle(state, node);

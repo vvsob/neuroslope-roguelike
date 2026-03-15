@@ -316,58 +316,76 @@ CARD_ART = {
 
 LEVEL_ART = {
     "n1": {
-        "title": "Floor 1",
-        "weaponName": "Scrapfang Shiv",
-        "weaponDescription": "A jagged trench knife pieced together from rail scrap and scorched bone.",
+        "title": "Уровень 1",
+        "weaponName": "Зазубренный шив",
+        "weaponDescription": "Траншейный нож из рельсового лома и обожжённой кости.",
         "weaponImage": "./src/assets/generated/n1-weapon.png",
-        "enemyName": "Cinder Rat Brute",
-        "enemyDescription": "A smoke-soaked tunnel predator with ember-lit eyes and furnace burns across its hide.",
+        "enemyName": "Пепельный упырь",
+        "enemyDescription": "Туннельный хищник, чья шкура пропитана шлаком.",
         "enemyImage": "./src/assets/generated/n1-enemy.png",
     },
     "n2": {
-        "title": "Floor 2",
-        "weaponName": "Static Pike",
-        "weaponDescription": "A long storm pike wound with cracked copper coils and a lightning focus at the tip.",
+        "title": "Уровень 2",
+        "weaponName": "Статическое копьё",
+        "weaponDescription": "Длинное копьё с медными катушками и кристаллом молнии на острие.",
         "weaponImage": "./src/assets/generated/n2-weapon.png",
-        "enemyName": "Lantern Stalker",
-        "enemyDescription": "A thin ruin hunter draped in chains and carrying a poisoned lantern through the fog.",
+        "enemyName": "Полое копьё",
+        "enemyDescription": "Призрак солдата. Тело истлело, но оружие продолжает убивать.",
         "enemyImage": "./src/assets/generated/n2-enemy.png",
     },
     "n3": {
-        "title": "Floor 3",
-        "weaponName": "Ashen Hookblade",
-        "weaponDescription": "A hooked campfire blade blackened by soot, built for ripping armor in close quarters.",
+        "title": "Уровень 3 — Привал",
+        "weaponName": "Пепельный крюк",
+        "weaponDescription": "Крюкообразный клинок, почерневший от сажи.",
         "weaponImage": "./src/assets/generated/n3-weapon.png",
-        "enemyName": "Pyre Sentinel",
-        "enemyDescription": "A dormant guardian formed from charcoal stone, still glowing with buried heat.",
-        "enemyImage": "./src/assets/generated/n3-enemy.png",
+        "enemyName": "—",
+        "enemyDescription": "Тихое место. Огонь потрескивает, давая передышку.",
+        "enemyImage": "./src/assets/player-placeholder.svg",
     },
     "n4": {
-        "title": "Floor 4",
-        "weaponName": "Prism Cutter",
-        "weaponDescription": "A relic dagger with a crystal edge that bends cold light into razor-thin arcs.",
+        "title": "Уровень 4",
+        "weaponName": "Призматический клинок",
+        "weaponDescription": "Реликтовый кинжал с кристальным лезвием, преломляющим холодный свет.",
         "weaponImage": "./src/assets/generated/n4-weapon.png",
-        "enemyName": "Vault Mimic",
-        "enemyDescription": "A treasure-chamber horror plated in gilded shells and jewel-like false eyes.",
+        "enemyName": "Ядовитый скиталец",
+        "enemyDescription": "Мутировавший падальщик. Яд сочится из трещин на панцире.",
         "enemyImage": "./src/assets/generated/n4-enemy.png",
     },
     "n5": {
-        "title": "Floor 5",
-        "weaponName": "Siegebreaker Maul",
-        "weaponDescription": "A brutal bronze war maul ringed with impact runes and hydraulic braces.",
+        "title": "Уровень 5 — Тайник",
+        "weaponName": "Реликтовый нож",
+        "weaponDescription": "Спрятанное оружие из эпохи до коллапса.",
         "weaponImage": "./src/assets/generated/n5-weapon.png",
-        "enemyName": "Bronze Husk Prime",
-        "enemyDescription": "An elite war construct with cracked plating, molten seams, and a crushing frame.",
-        "enemyImage": "./src/assets/generated/n5-enemy.png",
+        "enemyName": "—",
+        "enemyDescription": "Тайник с артефактами. Кто-то спрятал их здесь намеренно.",
+        "enemyImage": "./src/assets/player-placeholder.svg",
     },
     "n6": {
-        "title": "Floor 6",
-        "weaponName": "Neurolance",
-        "weaponDescription": "A ceremonial spear built around a living crystal spine and pulsing neural filaments.",
+        "title": "Уровень 6 — Элита",
+        "weaponName": "Молот осады",
+        "weaponDescription": "Тяжёлый боевой молот с гидравлическими крепежами.",
         "weaponImage": "./src/assets/generated/n6-weapon.png",
-        "enemyName": "The Neurolith",
-        "enemyDescription": "A colossal psychic monolith suspended in cables, stone plates, and cold blue fire.",
+        "enemyName": "Бронзовый корпус",
+        "enemyDescription": "Боевой конструкт эпохи Войн за ресурсы. Броня треснула, но расплав внутри ещё кипит.",
         "enemyImage": "./src/assets/generated/n6-enemy.png",
+    },
+    "n7": {
+        "title": "Уровень 7 — Привал",
+        "weaponName": "Ржавый резак",
+        "weaponDescription": "Инструмент выживания в руинах.",
+        "weaponImage": "./src/assets/generated/n7-weapon.png",
+        "enemyName": "—",
+        "enemyDescription": "Последний привал перед финальным испытанием.",
+        "enemyImage": "./src/assets/player-placeholder.svg",
+    },
+    "n8": {
+        "title": "Уровень 8 — Босс",
+        "weaponName": "Нейроланс",
+        "weaponDescription": "Церемониальное копьё с живым кристальным стержнем и пульсирующими нейронитями.",
+        "weaponImage": "./src/assets/generated/n8-weapon.png",
+        "enemyName": "Нейролит",
+        "enemyDescription": "Колоссальный психический монолит, подвешенный в кабелях и каменных плитах.",
+        "enemyImage": "./src/assets/generated/n8-enemy.png",
     },
 }
 
@@ -376,12 +394,13 @@ ENCOUNTERS = {
         {
             "enemies": [
                 {
-                    "name": "Ash Ghoul",
+                    "name": "Пепельный упырь",
+                    "description": "Туннельный хищник, чья шкура пропитана шлаком. Ярость нарастает с каждым ударом.",
                     "maxHp": 42,
                     "intents": [
-                        {"type": "attack", "value": 8, "label": "Claw 8"},
-                        {"type": "buff", "strength": 2, "label": "Rage +2 Strength"},
-                        {"type": "attackBlock", "value": 6, "block": 6, "label": "Rake 6 + Block 6"},
+                        {"type": "attack", "value": 8, "label": "Коготь 8"},
+                        {"type": "buff", "strength": 2, "label": "Ярость +2 Силы"},
+                        {"type": "attackBlock", "value": 6, "block": 6, "label": "Разрыв 6 + Блок 6"},
                     ],
                 }
             ]
@@ -389,12 +408,13 @@ ENCOUNTERS = {
         {
             "enemies": [
                 {
-                    "name": "Hollow Spear",
+                    "name": "Полое копьё",
+                    "description": "Призрак солдата, чьё тело истлело, но оружие осталось. Атакует роем осколков.",
                     "maxHp": 38,
                     "intents": [
-                        {"type": "attack", "value": 7, "label": "Lunge 7"},
-                        {"type": "attack", "value": 7, "repeats": 2, "label": "Flurry 7x2"},
-                        {"type": "debuff", "weak": 2, "label": "Pinning Curse"},
+                        {"type": "attack", "value": 7, "label": "Выпад 7"},
+                        {"type": "attack", "value": 7, "repeats": 2, "label": "Шквал 7x2"},
+                        {"type": "debuff", "weak": 2, "label": "Проклятие слабости"},
                     ],
                 }
             ]
@@ -402,21 +422,51 @@ ENCOUNTERS = {
         {
             "enemies": [
                 {
-                    "name": "Ash Ghoul",
+                    "name": "Пепельный упырь",
+                    "description": "Туннельный хищник, чья шкура пропитана шлаком.",
                     "maxHp": 36,
                     "intents": [
-                        {"type": "attack", "value": 6, "label": "Claw 6"},
-                        {"type": "attackBlock", "value": 5, "block": 5, "label": "Rake 5 + Block 5"},
+                        {"type": "attack", "value": 6, "label": "Коготь 6"},
+                        {"type": "attackBlock", "value": 5, "block": 5, "label": "Разрыв 5 + Блок 5"},
                     ],
                 },
                 {
-                    "name": "Hollow Spear",
+                    "name": "Полое копьё",
+                    "description": "Призрак, чьё оружие движется само по себе.",
                     "maxHp": 30,
                     "intents": [
-                        {"type": "attack", "value": 5, "label": "Lunge 5"},
-                        {"type": "debuff", "weak": 1, "label": "Pinning Curse"},
+                        {"type": "attack", "value": 5, "label": "Выпад 5"},
+                        {"type": "debuff", "weak": 1, "label": "Проклятие слабости"},
                     ],
                 },
+            ]
+        },
+        {
+            "enemies": [
+                {
+                    "name": "Ядовитый скиталец",
+                    "description": "Мутировавший падальщик. Яд сочится из трещин на его панцире.",
+                    "maxHp": 44,
+                    "intents": [
+                        {"type": "attack", "value": 5, "label": "Укус 5"},
+                        {"type": "poison", "amount": 3, "label": "Отравить +3"},
+                        {"type": "attackBlock", "value": 4, "block": 8, "label": "Отступить 4 + Блок 8"},
+                    ],
+                }
+            ]
+        },
+        {
+            "enemies": [
+                {
+                    "name": "Кремниевый страж",
+                    "description": "Автономный дрон охраны. Медленно перезаряжает щит между атаками.",
+                    "maxHp": 48,
+                    "intents": [
+                        {"type": "buff", "block": 10, "label": "Щит +10 Блока"},
+                        {"type": "attack", "value": 12, "label": "Разряд 12"},
+                        {"type": "debuff", "vulnerable": 2, "label": "Сенсорный сбой"},
+                    ],
+                }
             ]
         },
     ],
@@ -424,41 +474,57 @@ ENCOUNTERS = {
         {
             "enemies": [
                 {
-                    "name": "Bronze Husk",
+                    "name": "Бронзовый корпус",
+                    "description": "Боевой конструкт эпохи Войн за ресурсы. Броня треснула, но внутри всё ещё кипит расплав.",
                     "maxHp": 68,
                     "intents": [
-                        {"type": "attackBlock", "value": 10, "block": 8, "label": "Crush 10 + Block 8"},
-                        {"type": "buff", "strength": 3, "label": "Harden +3 Strength"},
-                        {"type": "attack", "value": 14, "label": "Hammerfall 14"},
+                        {"type": "attackBlock", "value": 10, "block": 8, "label": "Сокрушение 10 + Блок 8"},
+                        {"type": "buff", "strength": 3, "label": "Закалка +3 Силы"},
+                        {"type": "attack", "value": 14, "label": "Молот 14"},
+                        {"type": "heal", "amount": 12, "label": "Самопочинка 12"},
                     ],
                 },
                 {
-                    "name": "Shard Wisp",
+                    "name": "Осколочный призрак",
+                    "description": "Фрагмент разбитого ИИ. Нестабилен, но опасен роем шипов.",
                     "maxHp": 34,
                     "intents": [
-                        {"type": "attack", "value": 6, "repeats": 2, "label": "Needle 6x2"},
-                        {"type": "buff", "strength": 2, "label": "Flare +2 Strength"},
+                        {"type": "attack", "value": 6, "repeats": 2, "label": "Игла 6x2"},
+                        {"type": "buff", "strength": 2, "label": "Вспышка +2 Силы"},
+                        {"type": "poison", "amount": 2, "label": "Нейротоксин +2"},
                     ],
                 },
             ]
-        }
+        },
+        {
+            "enemies": [
+                {
+                    "name": "Резонирующий жнец",
+                    "description": "Существо из квантовой пены. Тело мерцает между атаками, восстанавливая силы.",
+                    "maxHp": 80,
+                    "intents": [
+                        {"type": "attack", "value": 13, "label": "Резонанс 13"},
+                        {"type": "debuff", "weak": 2, "vulnerable": 2, "label": "Дестабилизация"},
+                        {"type": "heal", "amount": 10, "label": "Квантовая регенерация"},
+                        {"type": "attack", "value": 9, "repeats": 2, "label": "Двойная волна 9x2"},
+                    ],
+                }
+            ]
+        },
     ],
     "boss": [
         {
             "enemies": [
                 {
-                    "name": "The Neurolith",
-                    "maxHp": 120,
+                    "name": "Нейролит",
+                    "description": "Колоссальный психический монолит, подвешенный в кабелях и каменных плитах. Его разум охватывает весь уровень.",
+                    "maxHp": 130,
                     "intents": [
-                        {"type": "attack", "value": 16, "label": "Pulse 16"},
-                        {"type": "debuff", "vulnerable": 2, "weak": 2, "label": "Mind Fracture"},
-                        {"type": "attack", "value": 12, "repeats": 2, "label": "Twin Surge 12x2"},
-                        {
-                            "type": "buff",
-                            "strength": 4,
-                            "block": 12,
-                            "label": "Ascend +4 Strength +12 Block",
-                        },
+                        {"type": "attack", "value": 16, "label": "Импульс 16"},
+                        {"type": "debuff", "vulnerable": 2, "weak": 2, "label": "Разлом разума"},
+                        {"type": "attack", "value": 12, "repeats": 2, "label": "Двойной всплеск 12x2"},
+                        {"type": "buff", "strength": 4, "block": 12, "label": "Вознесение +4 Силы +12 Блока"},
+                        {"type": "poison", "amount": 3, "label": "Нейропаразит +3"},
                     ],
                 }
             ]
@@ -467,12 +533,14 @@ ENCOUNTERS = {
 }
 
 MAP_TEMPLATE = [
-    {"id": "n1", "type": "hallway", "label": "Hallway Fight"},
-    {"id": "n2", "type": "hallway", "label": "Hallway Fight"},
-    {"id": "n3", "type": "campfire", "label": "Campfire"},
-    {"id": "n4", "type": "treasure", "label": "Treasure"},
-    {"id": "n5", "type": "elite", "label": "Elite"},
-    {"id": "n6", "type": "boss", "label": "Boss"},
+    {"id": "n1", "type": "hallway", "label": "Коридор"},
+    {"id": "n2", "type": "hallway", "label": "Коридор"},
+    {"id": "n3", "type": "campfire", "label": "Привал"},
+    {"id": "n4", "type": "hallway", "label": "Коридор"},
+    {"id": "n5", "type": "treasure", "label": "Тайник"},
+    {"id": "n6", "type": "elite", "label": "Элита"},
+    {"id": "n7", "type": "campfire", "label": "Привал"},
+    {"id": "n8", "type": "boss", "label": "Босс"},
 ]
 
 
@@ -755,7 +823,7 @@ def create_initial_state(generated_run: Optional[Dict[str, Any]] = None) -> Dict
         ]
 
     theme = (generated_run or {}).get("theme", "")
-    log_message = f"A new ascent begins — {theme}. Choose your route." if theme else "A new ascent begins. Choose your route."
+    log_message = f"Новый подъём начинается — {theme}. Выбери маршрут." if theme else "Новый подъём начинается. Выбери маршрут."
 
     return {
         "screen": "map",
@@ -882,7 +950,7 @@ def travel_to_node(state: Dict[str, Any], node_id: Optional[str], rng: random.Ra
     generated_run = state.get("_generatedRun")
     state["loadout"] = _get_level_art_for_run(node["id"], generated_run)
     state["floor"] = node["index"] + 1
-    add_log(state, f"You enter {node['label']}.")
+    add_log(state, f"Ты входишь в: {node['label']}.")
 
     if node["type"] in {"hallway", "elite", "boss"}:
         start_battle(state, node, rng)
@@ -940,7 +1008,7 @@ def start_battle(state: Dict[str, Any], node: Dict[str, Any], rng: random.Random
 
     trigger_relic_event(state, "onBattleStart", battle_context(state, rng))
     draw_cards(state, 5, rng)
-    add_log(state, f"{describe_encounter_headline(state)} appear.")
+    add_log(state, f"{describe_encounter_headline(state)} появляются.")
 
 
 def play_card(state: Dict[str, Any], index: int, rng: random.Random) -> Optional[Dict[str, Any]]:
@@ -1020,8 +1088,38 @@ def end_turn(state: Dict[str, Any], rng: random.Random) -> Optional[Dict[str, An
 
     draw_cards(state, 5, rng)
 
+    # Apply poison to player at end of turn
+    player_poison = state["player"].get("poison", 0)
+    if player_poison > 0:
+        absorb_damage(state["player"], player_poison)
+        add_log(state, f"Яд наносит {player_poison} урона.")
+        if intent_result is None:
+            intent_result = {"fx": [], "sfx": []}
+        intent_result["fx"].append({"type": "damage", "target": "player:0", "value": player_poison})
+        intent_result["sfx"].append("debuff")
+        state["player"]["poison"] = max(0, player_poison - 1)
+        if state["player"]["hp"] <= 0:
+            state["outcome"] = "defeat"
+            state["screen"] = "map"
+
+    # Apply poison to enemies at end of turn
     for enemy in state["enemies"]:
-        add_log(state, f"{enemy['name']} prepares {enemy['intent']['label']}.")
+        ep = enemy.get("poison", 0)
+        if ep > 0:
+            absorb_damage(enemy, ep)
+            add_log(state, f"{enemy['name']} получает {ep} урона от яда.")
+            if intent_result is None:
+                intent_result = {"fx": [], "sfx": []}
+            intent_result["fx"].append({"type": "damage", "target": get_enemy_fx_target(state, enemy["id"]), "value": ep})
+            intent_result["sfx"].append("debuff")
+            enemy["poison"] = max(0, ep - 1)
+
+    process_defeated_enemies(state)
+    if not state["enemies"] and state["screen"] == "battle":
+        win_battle(state, rng)
+
+    for enemy in state["enemies"]:
+        add_log(state, f"{enemy['name']} готовит: {enemy['intent']['label']}.")
 
     return intent_result or {"fx": [], "sfx": []}
 
@@ -1044,7 +1142,7 @@ def run_enemy_intent(state: Dict[str, Any]) -> Dict[str, Any]:
                     state["player"].get("vulnerable", 0),
                 )
                 absorb_damage(state["player"], damage)
-                add_log(state, f"{enemy['name']} hits for {damage}.")
+                add_log(state, f"{enemy['name']} наносит {damage} урона.")
                 fx_events.append({"type": "damage", "target": "player:0", "value": damage})
                 sfx_list.append("enemyAttack")
                 if state["player"]["hp"] <= 0:
@@ -1062,7 +1160,7 @@ def run_enemy_intent(state: Dict[str, Any]) -> Dict[str, Any]:
         if intent["type"] == "buff":
             enemy["strength"] += intent.get("strength", 0)
             enemy["block"] += intent.get("block", 0)
-            add_log(state, f"{enemy['name']} grows stronger.")
+            add_log(state, f"{enemy['name']} становится сильнее.")
             fx_events.append(
                 {"type": "buff", "target": get_enemy_fx_target(state, enemy["id"]), "label": intent.get("label")}
             )
@@ -1071,15 +1169,29 @@ def run_enemy_intent(state: Dict[str, Any]) -> Dict[str, Any]:
         if intent["type"] == "debuff":
             state["player"]["weak"] += intent.get("weak", 0)
             state["player"]["vulnerable"] += intent.get("vulnerable", 0)
-            add_log(state, f"{enemy['name']} curses your footing.")
+            add_log(state, f"{enemy['name']} проклинает тебя.")
             fx_events.append({"type": "debuff", "target": "player:0", "label": intent.get("label")})
             sfx_list.append("debuff")
+
+        if intent["type"] == "poison":
+            amount = intent.get("amount", 3)
+            state["player"]["poison"] = state["player"].get("poison", 0) + amount
+            add_log(state, f"{enemy['name']} отравляет тебя на {amount}.")
+            fx_events.append({"type": "debuff", "target": "player:0", "label": f"Яд +{amount}"})
+            sfx_list.append("debuff")
+
+        if intent["type"] == "heal":
+            amount = intent.get("amount", 10)
+            enemy["hp"] = min(enemy["maxHp"], enemy["hp"] + amount)
+            add_log(state, f"{enemy['name']} восстанавливает {amount} HP.")
+            fx_events.append({"type": "heal", "target": get_enemy_fx_target(state, enemy["id"]), "value": amount})
+            sfx_list.append("buff")
 
     return {"fx": fx_events, "sfx": sfx_list}
 
 
 def win_battle(state: Dict[str, Any], rng: random.Random) -> None:
-    add_log(state, "The encounter is cleared.")
+    add_log(state, "Схватка завершена.")
     state["enemies"] = []
     state["selectedEnemyId"] = None
     state["player"]["block"] = 0
@@ -1099,7 +1211,7 @@ def claim_reward(state: Dict[str, Any], card_id: str) -> None:
     state["player"]["deck"].append(card_id)
     card_def = _get_card_def(card_id, state.get("_generatedRun"))
     card_name = card_def["name"] if card_def else card_id
-    add_log(state, f"You add {card_name} to your deck.")
+    add_log(state, f"Карта «{card_name}» добавлена в колоду.")
     state["rewardOptions"] = []
     state["screen"] = "map"
 
@@ -1107,7 +1219,7 @@ def claim_reward(state: Dict[str, Any], card_id: str) -> None:
 def rest_at_campfire(state: Dict[str, Any]) -> None:
     player = state["player"]
     player["hp"] = min(player["maxHp"], player["hp"] + 16)
-    add_log(state, "You rest at the fire and recover 16 HP.")
+    add_log(state, "Ты отдыхаешь у костра и восстанавливаешь 16 HP.")
     complete_current_node(state)
     state["screen"] = "map"
 
@@ -1265,7 +1377,7 @@ def absorb_damage(target: Dict[str, Any], damage: int) -> None:
 def process_defeated_enemies(state: Dict[str, Any]) -> None:
     defeated = [enemy for enemy in state["enemies"] if enemy.get("hp", 0) <= 0]
     for enemy in defeated:
-        add_log(state, f"{enemy['name']} falls.")
+        add_log(state, f"{enemy['name']} повержен.")
     state["enemies"] = [enemy for enemy in state["enemies"] if enemy.get("hp", 0) > 0]
     if not any(enemy["id"] == state.get("selectedEnemyId") for enemy in state["enemies"]):
         state["selectedEnemyId"] = state["enemies"][0]["id"] if state["enemies"] else None
@@ -1318,7 +1430,7 @@ def grant_relic(state: Dict[str, Any], relic_id: str) -> None:
         return
     if relic_id not in state["player"]["relics"]:
         state["player"]["relics"].append(relic_id)
-    add_log(state, f"You claim {relic['name']}.")
+    add_log(state, f"Реликвия «{relic['name']}» получена.")
 
 
 def battle_context(state: Dict[str, Any], rng: random.Random, card: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

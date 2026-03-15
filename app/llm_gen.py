@@ -87,14 +87,16 @@ Max player energy per turn: 3.
 ═══════════════════════════════════════
 BALANCE GUIDELINES
 ═══════════════════════════════════════
-- Hallway enemies (n1, n2): moderate threat, HP 28-55, attacks 5-12, max 2 enemies per encounter
-- Elite (n5): real challenge, HP 65-90, attacks 10-18, must have one unique mechanic
-- Boss (n6): HP 105-135, 4+ intents, escalating danger pattern
+- Hallway enemies (n1, n2, n4): moderate threat, HP 28-55, attacks 5-12, max 2 enemies per encounter
+- Elite (n6): real challenge, HP 65-95, attacks 10-18, must have one unique mechanic (poison/heal/buff combo)
+- Boss (n8): HP 110-145, 4+ intents, escalating danger pattern, should feel EPIC
 - Card costs: 0-2 energy. Cost 2 = powerful. Cost 0 = very weak (cantrip).
 - Damage numbers: a 2-cost Attack dealing 20 is fine; 40+ is too strong.
 - Block numbers: 8-14 is typical for a 1-cost Skill.
 - Cards must have exactly ONE behavior with trigger "onPlay".
 - Relic effects: moderate per-trigger. No "+5 strength on every card played".
+- Enemy intents with type "poison" apply poison stack to the player (use "amount": 2-5).
+- Enemy intents with type "heal" restore HP to the enemy itself (use "amount": 10-25).
 
 ═══════════════════════════════════════
 EFFECT REFERENCE (all available types)
@@ -217,23 +219,37 @@ THEMATIC GUIDANCE
 - Each card should have a unique mechanical hook — avoid generating 6 plain "deal X damage" cards
 
 ═══════════════════════════════════════
+INTENT TYPES REFERENCE
+═══════════════════════════════════════
+  attack      — {"type":"attack","value":10,"label":"Strike 10"}
+  attackBlock — {"type":"attackBlock","value":8,"block":6,"label":"Slash + Shield"}
+  buff        — {"type":"buff","strength":3,"label":"Power Up +3 STR"}  (or block)
+  debuff      — {"type":"debuff","weak":2,"label":"Weaken 2"}  (or vulnerable)
+  poison      — {"type":"poison","amount":4,"label":"Venom +4"}  — applies 4 poison to the player
+  heal        — {"type":"heal","amount":15,"label":"Regenerate 15"}  — enemy heals itself
+
+═══════════════════════════════════════
 OUTPUT SCHEMA (return ONLY this JSON)
 ═══════════════════════════════════════
 
 {
   "theme": "short thematic title (3-6 words)",
-  "worldStyle": "shared visual style for ALL art in this run (15-25 words)",
+  "worldStyle": "shared visual style for ALL art in this run (15-25 words, NO photorealistic, NO 3D render — use painterly/oil painting/hand-drawn style)",
   "encounters": {
     "hallway": [
-      {"enemies": [{"name":"string","maxHp":28-55,"intents":[
-        {"type":"attack|buff|attackBlock|debuff","value":number_if_attack,"label":"string",
-         "strength":optional,"block":optional,"weak":optional,"vulnerable":optional,"repeats":optional}
+      {"enemies": [{"name":"string","description":"1 sentence flavour","maxHp":28-55,"intents":[
+        {"type":"attack|buff|attackBlock|debuff|poison","value":number_if_attack,"label":"string",
+         "strength":optional,"block":optional,"weak":optional,"vulnerable":optional,"amount":optional,"repeats":optional}
       ]}]},
-      {"enemies": [/* variant 2 */]},
-      {"enemies": [/* variant 3, can be 2 enemies */]}
+      {"enemies": [/* variant 2, can be 2 enemies */]},
+      {"enemies": [/* variant 3 */]},
+      {"enemies": [/* variant 4 */]}
     ],
-    "elite": [{"enemies": [{"name":"string","maxHp":65-90,"intents":[/* 3-4 intents */]}]}],
-    "boss":  [{"enemies": [{"name":"string","maxHp":105-135,"intents":[/* 4-5 intents */]}]}]
+    "elite": [
+      {"enemies": [{"name":"string","description":"1 sentence flavour","maxHp":65-95,"intents":[/* 3-4 intents, must include poison OR heal OR buff */]}]},
+      {"enemies": [/* variant 2 */]}
+    ],
+    "boss":  [{"enemies": [{"name":"string","description":"1 sentence boss lore","maxHp":110-145,"intents":[/* 4-5 intents, use poison+heal+attack combo */]}]}]
   },
   "cards": [
     {
@@ -258,38 +274,44 @@ OUTPUT SCHEMA (return ONLY this JSON)
   ],
   "levelArt": {
     "n1": {"title":"Floor 1","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[0].enemies[0].name","enemyDescription":"1 sentence"},
-    "n2": {"title":"Floor 2","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[1] or hallway[2] first enemy","enemyDescription":"1 sentence"},
-    "n3": {"title":"Floor 3 — Campfire","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"A quiet rest point."},
-    "n4": {"title":"Floor 4 — Vault","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"A hidden cache of relics."},
-    "n5": {"title":"Floor 5 — Elite","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches elite enemy name","enemyDescription":"1 sentence"},
-    "n6": {"title":"Floor 6 — Boss","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches boss enemy name","enemyDescription":"1 sentence"}
+    "n2": {"title":"Floor 2","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[1] first enemy","enemyDescription":"1 sentence"},
+    "n3": {"title":"Floor 3 — Rest","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"A moment of quiet."},
+    "n4": {"title":"Floor 4","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches hallway[2] or hallway[3] first enemy","enemyDescription":"1 sentence"},
+    "n5": {"title":"Floor 5 — Cache","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"A hidden cache of relics."},
+    "n6": {"title":"Floor 6 — Elite","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches elite[0] enemy name","enemyDescription":"1 sentence"},
+    "n7": {"title":"Floor 7 — Rest","weaponName":"string","weaponDescription":"1 sentence","enemyName":"none","enemyDescription":"Final rest before the summit."},
+    "n8": {"title":"Floor 8 — Boss","weaponName":"string","weaponDescription":"1 sentence","enemyName":"matches boss enemy name","enemyDescription":"1 sentence"}
   },
   "mapNodes": [
     {"id":"n1","type":"hallway","label":"string"},
     {"id":"n2","type":"hallway","label":"string"},
     {"id":"n3","type":"campfire","label":"string"},
-    {"id":"n4","type":"treasure","label":"string"},
-    {"id":"n5","type":"elite","label":"string"},
-    {"id":"n6","type":"boss","label":"string"}
+    {"id":"n4","type":"hallway","label":"string"},
+    {"id":"n5","type":"treasure","label":"string"},
+    {"id":"n6","type":"elite","label":"string"},
+    {"id":"n7","type":"campfire","label":"string"},
+    {"id":"n8","type":"boss","label":"string"}
   ],
   "imagePrompts": {
     "n1": {
-      "weapon": "image prompt that BEGINS with worldStyle, then describes the weapon specifically",
-      "enemy": "image prompt that BEGINS with worldStyle, then describes the enemy specifically"
+      "weapon": "image prompt that BEGINS with worldStyle, then describes the weapon — painterly, hand-drawn, no plastic look",
+      "enemy": "image prompt that BEGINS with worldStyle, then describes the enemy — oil painting style, dramatic lighting"
     },
     "n2": {"weapon":"...","enemy":"..."},
-    "n5": {"weapon":"...","enemy":"..."},
-    "n6": {"weapon":"...","enemy":"..."}
+    "n4": {"weapon":"...","enemy":"..."},
+    "n6": {"weapon":"...","enemy":"..."},
+    "n8": {"weapon":"...","enemy":"..."}
   }
 }
 
 STRICT RULES:
-- Exactly 3 hallway variants, 1 elite, 1 boss
-- Exactly 6 cards — at least 2 must use advanced effects (multiHit/splitDamage/lifesteal/execute/echo/condition/dynamic amounts)
+- Exactly 4 hallway variants, 2 elite variants, 1 boss
+- Exactly 8 cards — at least 3 must use advanced effects (multiHit/splitDamage/lifesteal/execute/echo/condition/dynamic amounts)
 - Exactly 3 relics
 - Every intent needs a "label"
-- Attack intents need "value"; buff/debuff use strength/block/weak/vulnerable instead
+- Attack intents need "value"; buff/debuff use strength/block/weak/vulnerable; poison/heal use "amount"
 - Image prompts: each one starts with worldStyle verbatim, then adds subject-specific details
+- worldStyle MUST mention "painterly" or "oil painting" or "hand-drawn" — never "photorealistic" or "3D"
 - No markdown, no explanation — pure JSON only"""
 
 
@@ -326,6 +348,10 @@ def _validate_intent(intent: Dict[str, Any]) -> Dict[str, Any]:
             base["weak"] = max(1, int(intent["weak"]))
         if "vulnerable" in intent:
             base["vulnerable"] = max(1, int(intent["vulnerable"]))
+    elif intent_type == "poison":
+        base["amount"] = max(1, min(10, int(intent.get("amount", 3))))
+    elif intent_type == "heal":
+        base["amount"] = max(1, min(40, int(intent.get("amount", 12))))
 
     return base
 
@@ -338,6 +364,7 @@ def _validate_enemy(enemy: Dict[str, Any], hp_range: tuple[int, int]) -> Dict[st
         intents = [{"type": "attack", "value": 6, "label": "Strike 6"}]
     return {
         "name": str(enemy.get("name", "Unknown"))[:40],
+        "description": str(enemy.get("description", ""))[:160],
         "maxHp": max_hp,
         "intents": intents,
     }
@@ -371,41 +398,45 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
     # Encounters
     hallway_raw = enc.get("hallway") or []
     hallway = []
-    for h in hallway_raw[:3]:
+    for h in hallway_raw[:4]:
         enemies = [_validate_enemy(e, (28, 55)) for e in (h.get("enemies") or [])]
         if enemies:
             hallway.append({"enemies": enemies})
     if not hallway:
-        hallway = [{"enemies": [{"name": "Grunt", "maxHp": 38, "intents": [{"type": "attack", "value": 7, "label": "Strike 7"}]}]}]
+        hallway = [{"enemies": [{"name": "Grunt", "description": "", "maxHp": 38, "intents": [{"type": "attack", "value": 7, "label": "Strike 7"}]}]}]
 
-    elite_raw = (enc.get("elite") or [{}])[0]
-    elite_enemies = [_validate_enemy(e, (65, 90)) for e in (elite_raw.get("enemies") or [])]
-    if not elite_enemies:
-        elite_enemies = [{"name": "Guardian", "maxHp": 72, "intents": [{"type": "attack", "value": 12, "label": "Crush 12"}]}]
+    elite_raw_list = enc.get("elite") or [{}]
+    elite = []
+    for er in elite_raw_list[:2]:
+        elite_enemies = [_validate_enemy(e, (65, 95)) for e in (er.get("enemies") or [])]
+        if elite_enemies:
+            elite.append({"enemies": elite_enemies})
+    if not elite:
+        elite = [{"enemies": [{"name": "Guardian", "description": "", "maxHp": 72, "intents": [{"type": "attack", "value": 12, "label": "Crush 12"}]}]}]
 
     boss_raw = (enc.get("boss") or [{}])[0]
-    boss_enemies = [_validate_enemy(e, (105, 135)) for e in (boss_raw.get("enemies") or [])]
+    boss_enemies = [_validate_enemy(e, (110, 145)) for e in (boss_raw.get("enemies") or [])]
     if not boss_enemies:
-        boss_enemies = [{"name": "Overlord", "maxHp": 120, "intents": [{"type": "attack", "value": 16, "label": "Pulse 16"}]}]
+        boss_enemies = [{"name": "Overlord", "description": "", "maxHp": 125, "intents": [{"type": "attack", "value": 16, "label": "Pulse 16"}]}]
 
     encounters = {
         "hallway": hallway,
-        "elite": [{"enemies": elite_enemies}],
+        "elite": elite,
         "boss": [{"enemies": boss_enemies}],
     }
 
     # Cards
     cards_raw = data.get("cards") or []
-    cards = [_validate_card(c) for c in cards_raw[:6]]
+    cards = [_validate_card(c) for c in cards_raw[:8]]
 
     # Relics
     relics_raw = data.get("relics") or []
     relics = [_validate_relic(r) for r in relics_raw[:3]]
 
-    # Level art
+    # Level art — now 8 nodes
     level_art_raw = data.get("levelArt") or {}
     level_art: Dict[str, Any] = {}
-    for node_id in ("n1", "n2", "n3", "n4", "n5", "n6"):
+    for node_id in ("n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8"):
         raw = level_art_raw.get(node_id) or {}
         level_art[node_id] = {
             "title": str(raw.get("title", f"Floor {node_id[1:]}")),
@@ -417,9 +448,13 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
             "enemyImage": f"./src/assets/generated/run/{node_id}-enemy.png",
         }
 
-    # Map nodes
+    # Map nodes — 8 nodes
     map_nodes_raw = data.get("mapNodes") or []
-    node_types = {"n1": "hallway", "n2": "hallway", "n3": "campfire", "n4": "treasure", "n5": "elite", "n6": "boss"}
+    node_types = {
+        "n1": "hallway", "n2": "hallway", "n3": "campfire",
+        "n4": "hallway", "n5": "treasure", "n6": "elite",
+        "n7": "campfire", "n8": "boss",
+    }
     map_nodes = []
     node_map = {n["id"]: n for n in map_nodes_raw if isinstance(n, dict)}
     for i, (nid, ntype) in enumerate(node_types.items()):
@@ -439,11 +474,10 @@ def _validate_run(data: Dict[str, Any]) -> Dict[str, Any]:
     # Image prompts — prepend worldStyle if not already present
     image_prompts = {}
     raw_prompts = data.get("imagePrompts") or {}
-    for node_id in ("n1", "n2", "n5", "n6"):
+    for node_id in ("n1", "n2", "n4", "n6", "n8"):
         node_prompts = raw_prompts.get(node_id) or {}
         weapon_prompt = str(node_prompts.get("weapon", ""))[:500]
         enemy_prompt = str(node_prompts.get("enemy", ""))[:500]
-        # Ensure worldStyle is prepended if present and not already included
         if world_style and not weapon_prompt.startswith(world_style[:30]):
             weapon_prompt = f"{world_style}, {weapon_prompt}" if weapon_prompt else world_style
         if world_style and not enemy_prompt.startswith(world_style[:30]):
