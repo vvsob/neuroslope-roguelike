@@ -110,6 +110,108 @@ const MAP_TEMPLATE = [
   { id: "n6", type: "boss", label: "Boss" },
 ];
 
+// Look up a card definition from server-provided catalog or local fallback
+function getCardDef(cardId, state) {
+  return (state?.cardCatalog?.[cardId]) ?? CARD_LIBRARY[cardId] ?? null;
+}
+
+// Look up a relic definition from server-provided catalog or local fallback
+function getRelicDef(relicId, state) {
+  return (state?.relicCatalog?.[relicId]) ?? RELIC_LIBRARY[relicId] ?? null;
+}
+
+export function createGameRenderer(root, { onAction } = {}) {
+  if (!root) {
+    return null;
+  }
+
+  let state = null;
+  let animationTimeoutId = null;
+
+  function setState(nextState, { fx = [], sfx = [] } = {}) {
+    if (nextState) {
+      state = typeof structuredClone === "function"
+        ? structuredClone(nextState)
+        : JSON.parse(JSON.stringify(nextState));
+    } else {
+      state = nextState;
+    }
+    render();
+
+    if (sfx.length > 0) {
+      for (const sound of sfx) {
+        playSfx(sound);
+      }
+    }
+
+    if (fx.length > 0) {
+      triggerFx(fx);
+    }
+
+    scheduleCardAnimationCleanup();
+  }
+
+  function render() {
+    if (!state) {
+      root.innerHTML = `
+        <div class="boot-card">
+          <p class="eyebrow">Neuroslope</p>
+          <h1>Connecting...</h1>
+          <p class="muted">Waiting for the spire to respond.</p>
+        </div>
+      `;
+      return;
+    }
+
+    root.innerHTML = renderApp(state);
+    bindEvents();
+  }
+
+  function bindEvents() {
+    for (const button of root.querySelectorAll("[data-action]")) {
+      button.addEventListener("click", () => {
+        const action = button.dataset.action;
+        const id = button.dataset.id;
+
+        if (action === "toggle-sfx") {
+          SFX.toggle();
+          render();
+          return;
+        }
+
+        if (onAction) {
+          onAction(action, id);
+        }
+      });
+    }
+  }
+
+  function scheduleCardAnimationCleanup() {
+    if (animationTimeoutId) {
+      clearTimeout(animationTimeoutId);
+      animationTimeoutId = null;
+    }
+
+    if (!state?.cardAnimation) {
+      return;
+    }
+
+    animationTimeoutId = window.setTimeout(() => {
+      if (!state) {
+        return;
+      }
+      state.cardAnimation = null;
+      render();
+    }, 720);
+  }
+
+  return {
+    setState,
+    render,
+    getState: () => state,
+  };
+}
+
 export function mountApp(root) {
   if (!root) {
     return;
@@ -329,8 +431,7 @@ function renderTopBar(state) {
         <p class="eyebrow">Encounter</p>
         <h3>${describeEncounterHeadline(state)}</h3>
         <p class="muted">${state.enemies.length > 0 ? "Battle in progress" : "Choose the next room on the map."}</p>
-        <!-- [SFX] Sound toggle -->
-        <button class="button-muted" style="margin-top:8px;padding:5px 10px;font-size:0.8rem;border-radius:12px;" data-action="toggle-sfx">
+        <button class="button-muted topbar-toggle" data-action="toggle-sfx">
           ${SFX.enabled ? "🔊 Sound on" : "🔇 Sound off"}
         </button>
       </div>
@@ -357,42 +458,22 @@ function renderBattle(state) {
       </section>
       <section class="battle-hud">
         <div class="hand-panel">
-          <div class="hand-backdrop"></div>
           <div class="hand-shell">
-            <div class="hand-head">
-              <div class="hand-title">
-                <h3>Hand</h3>
-                <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
-                  <span>${state.player.energy}</span>
-                </div>
-              </div>
-              <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
-            </div>
             <div class="hand-row">
               ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
             </div>
           </div>
         </div>
-        <div class="battle-sidepanel control-card">
+        <div class="battle-sidepanel">
           <p class="eyebrow">Turn</p>
-          <h3>Energy ${state.player.energy}/${state.player.maxEnergy}</h3>
-          <p class="muted">Hand ${state.player.hand.length} | Draw ${state.player.drawPile.length}</p>
-          <p class="muted">Discard ${state.player.discardPile.length} | Exhaust ${state.player.exhaustPile.length}</p>
+          <div class="turn-energy">
+            <h3>Energy ${state.player.energy}/${state.player.maxEnergy}</h3>
+            <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
+              <span>${state.player.energy}</span>
+            </div>
+          </div>
+          <p class="muted">Hand ${state.player.hand.length}</p>
           <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
-        </div>
-        <div class="battle-deckbar">
-          <div class="stat-card">
-            <p class="eyebrow">Draw</p>
-            <h3>${state.player.drawPile.length}</h3>
-          </div>
-          <div class="stat-card">
-            <p class="eyebrow">Discard</p>
-            <h3>${state.player.discardPile.length}</h3>
-          </div>
-          <div class="stat-card">
-            <p class="eyebrow">Exhaust</p>
-            <h3>${state.player.exhaustPile.length}</h3>
-          </div>
         </div>
       </section>
     </section>
@@ -446,9 +527,9 @@ function renderEnemy(enemy, selectedEnemyId, index) {
 }
 
 function renderCard(cardId, state, index) {
-  const card = CARD_LIBRARY[cardId];
+  const card = getCardDef(cardId, state);
   const disabled = !card || state.player.energy < card.cost || state.outcome;
-  const art = resolveCardArt(cardId, card);
+  const art = resolveCardArt(cardId, card, state);
   return `
     <button class="card" data-action="play-card" data-id="${index}" ${disabled ? "disabled" : ""}>
       <div class="card-top">
@@ -649,8 +730,8 @@ function renderNonBattle(state) {
               ? `<p class="muted">No relics yet.</p>`
               : state.player.relics
                   .map((relicId) => {
-                    const relic = describeRelic(relicId);
-                    return `<p>${relic.icon} ${relic.name}</p>`;
+                    const relic = getRelicDef(relicId, state) ?? describeRelic(relicId);
+                    return relic ? `<p>${relic.icon} ${relic.name}</p>` : "";
                   })
                   .join("")
           }
@@ -713,7 +794,7 @@ function renderOverlay(state) {
           <p class="eyebrow">Reward</p>
           <h2>Choose a card</h2>
           <div class="reward-options">
-            ${state.rewardOptions.map((cardId) => renderRewardCard(cardId)).join("")}
+            ${state.rewardOptions.map((cardId) => renderRewardCard(cardId, state)).join("")}
           </div>
           <button class="button-muted" data-action="skip-reward">Skip reward</button>
         </div>
@@ -735,7 +816,7 @@ function renderOverlay(state) {
   }
 
   if (state.screen === "treasure") {
-    const relic = state.pendingRelicRewardId ? RELIC_LIBRARY[state.pendingRelicRewardId] : null;
+    const relic = state.pendingRelicRewardId ? getRelicDef(state.pendingRelicRewardId, state) : null;
     return `
       <div class="overlay">
         <div class="overlay-card">
@@ -764,9 +845,9 @@ function renderOverlay(state) {
   return "";
 }
 
-function renderRewardCard(cardId) {
-  const card = CARD_LIBRARY[cardId];
-  const art = resolveCardArt(cardId, card);
+function renderRewardCard(cardId, state) {
+  const card = getCardDef(cardId, state);
+  const art = resolveCardArt(cardId, card, state);
   return `
     <button class="reward-option" data-action="claim-reward" data-id="${cardId}">
       <p class="eyebrow">${card.type}</p>
@@ -785,7 +866,16 @@ function renderRewardCard(cardId) {
   `;
 }
 
-function resolveCardArt(cardId, card) {
+function resolveCardArt(cardId, card, state) {
+  if (state?.cardCatalog?.[cardId]?.image) {
+    return {
+      src: state.cardCatalog[cardId].image,
+      alt: card?.name ?? cardId,
+      fallback: state.cardCatalog[cardId].fallback ?? "./src/assets/player-placeholder.svg",
+      variant: card?.type === "Attack" ? "card-art-weapon" : "card-art-enemy",
+    };
+  }
+
   const cardArt = getCardArt(cardId);
   return {
     src: cardArt.image,

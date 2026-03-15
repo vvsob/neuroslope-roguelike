@@ -136,23 +136,29 @@ p {
 
 .spire-battle-layout {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-rows: minmax(360px, 1fr) auto;
+  gap: 14px;
   min-height: 0;
+  padding: 0 10px 12px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(255, 232, 166, 0.08), transparent 18%),
+    radial-gradient(circle at 50% 100%, rgba(152, 92, 41, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(24, 30, 42, 0.72), rgba(12, 15, 23, 0.95)),
+    linear-gradient(180deg, rgba(54, 38, 29, 0.22), rgba(12, 14, 18, 0));
 }
 
 .battle-scene {
   position: relative;
-  min-height: 0;
-  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.92fr) minmax(120px, 0.42fr) minmax(320px, 1.08fr);
+  align-items: center;
   min-height: 520px;
+  padding: 24px 22px 0;
   overflow: hidden;
-  border-radius: 22px;
-  border: 1px solid rgba(182, 198, 226, 0.08);
-  background:
-    radial-gradient(circle at 50% 15%, rgba(255, 232, 166, 0.08), transparent 18%),
-    linear-gradient(180deg, rgba(24, 30, 42, 0.72), rgba(12, 15, 23, 0.95)),
-    linear-gradient(180deg, rgba(54, 38, 29, 0.22), rgba(12, 14, 18, 0));
+  border-radius: 22px 22px 0 0;
+  border: 0;
+  background: transparent;
 }
 
 .battle-scene::before {
@@ -166,37 +172,32 @@ p {
 }
 
 .combatant {
-  position: absolute;
+  position: relative;
   z-index: 1;
   display: flex;
 }
 
 .enemy-side {
-  position: absolute;
   display: flex;
-  z-index: 1;
-  top: 50%;
-  right: 34px;
-  width: min(760px, 58vw);
-  transform: translateY(-50%);
+  grid-column: 3;
+  width: 100%;
   justify-content: flex-end;
   align-items: center;
   align-content: center;
   flex-wrap: wrap;
-  gap: 18px;
+  gap: 22px;
 }
 
 .player-side {
-  top: 50%;
-  left: 34px;
-  width: min(320px, 28vw);
-  transform: translateY(-50%);
+  grid-column: 1;
+  width: 100%;
   justify-content: flex-start;
   align-items: center;
 }
 
 .combatant-frame {
   position: relative;
+  width: 100%;
 }
 
 .enemy-frame,
@@ -210,12 +211,18 @@ p {
   z-index: 1;
   display: block;
   flex: 0 0 auto;
-  width: min(240px, 24vw);
+  width: min(250px, 100%);
   max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .enemy-frame {
   position: relative;
+  background: transparent;
+  box-shadow: none;
 }
 
 .enemy-portrait-wrap {
@@ -225,7 +232,8 @@ p {
 
 .player-loadout {
   display: grid;
-  gap: 8px;
+  gap: 12px;
+  width: min(300px, 100%);
 }
 
 .portrait {
@@ -272,16 +280,16 @@ p {
 }
 
 .combat-footer {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .enemy-footer {
   width: min(260px, 100%);
-  margin: 8px auto 0;
+  margin: 10px auto 0;
 }
 
 .player-footer {
-  width: min(240px, 100%);
+  width: min(280px, 100%);
   margin: 0 auto;
 }
 
@@ -356,9 +364,9 @@ p {
 
 .intent-badge {
   position: absolute;
-  top: 0;
+  top: -6px;
   left: 50%;
-  transform: translate(-50%, -48%);
+  transform: translate(-50%, -100%);
   z-index: 3;
 }
 
@@ -491,20 +499,34 @@ p {
 
 .battle-hud {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px 240px;
-  grid-template-areas: "hand deck turn";
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 236px;
+  grid-template-areas: "hand turn";
+  gap: 14px;
   align-items: end;
 }
 
 .battle-sidepanel {
   grid-area: turn;
-  min-height: 172px;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 8px 0 8px 12px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.turn-energy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .end-turn-button {
   width: 100%;
-  margin-top: 10px;
+  margin-top: 12px;
   padding: 11px 14px;
 }
 
@@ -526,43 +548,19 @@ p {
 .hand-panel {
   grid-area: hand;
   position: relative;
-  min-height: 236px;
-  padding: 0 20px 8px;
-}
-
-.hand-backdrop {
-  position: absolute;
-  inset: auto 0 0;
-  height: 150px;
-  border-radius: 999px 999px 0 0;
-  background:
-    radial-gradient(circle at 50% 100%, rgba(210, 170, 97, 0.14), transparent 48%),
-    linear-gradient(180deg, rgba(17, 21, 30, 0.2), rgba(8, 10, 15, 0.72));
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
 }
 
 .hand-shell {
   position: relative;
   z-index: 1;
-}
-
-.hand-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 12px;
-  margin-bottom: 8px;
-  padding: 0 10px;
-}
-
-.hand-head .muted {
-  max-width: 28rem;
-  text-align: right;
-}
-
-.hand-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .energy-orb {
@@ -597,14 +595,10 @@ p {
   justify-content: center;
   align-items: end;
   gap: 0;
-  min-height: 188px;
+  min-height: 278px;
   overflow-x: auto;
-  overflow-y: hidden;
-  padding: 10px 20px 4px;
-}
-
-.battle-deckbar {
-  grid-area: deck;
+  overflow-y: visible;
+  padding: 24px 10px 16px;
 }
 
 .hand-row::-webkit-scrollbar {
@@ -736,6 +730,13 @@ p {
 
 .battle-deckbar {
   grid-template-columns: 1fr;
+}
+
+.topbar-toggle {
+  margin-top: 10px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-radius: 999px;
 }
 
 .deck-strip {
@@ -890,36 +891,35 @@ code {
   }
 
   .top-bar,
-  .map-screen,
-  .battle-hud {
+  .map-screen {
     grid-template-columns: 1fr;
   }
 
-  .battle-sidepanel,
-  .battle-deckbar {
-    order: 2;
+  .battle-scene {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 28px;
+    padding: 28px 20px 22px;
   }
 
-  .hand-panel {
-    order: 1;
+  .player-side,
+  .enemy-side {
+    grid-column: auto;
+    justify-content: center;
+  }
+
+  .battle-hud {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "hand"
+      "turn";
   }
 }
 
 @media (max-width: 920px) {
   .battle-scene {
-    min-height: 420px;
-  }
-
-  .enemy-side {
-    top: 40%;
-    right: 18px;
-    width: min(260px, 70vw);
-  }
-
-  .player-side {
-    top: 72%;
-    left: 18px;
-    width: min(220px, 58vw);
+    min-height: 0;
+    padding-inline: 14px;
   }
 
   .hand-panel {
@@ -935,13 +935,19 @@ code {
     margin-left: -10px;
   }
 
-  .enemy-side {
-    justify-content: center;
+  .enemy-card,
+  .player-loadout {
+    width: min(240px, 100%);
   }
 
-  .enemy-frame .portrait,
-  .player-frame > div {
-    width: min(240px, 100%);
+  .hand-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hand-head .muted {
+    max-width: none;
+    text-align: left;
   }
 }
 
@@ -980,4 +986,85 @@ code {
     opacity: 0;
     transform: scale(1.24);
   }
+}
+
+/* ── Auth & menu screens ─────────────────────────────────────────────────── */
+
+.screen-card {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  padding: 28px;
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.input-field {
+  display: grid;
+  gap: 6px;
+}
+
+.input-field input {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(9, 12, 18, 0.8);
+  color: var(--text);
+  font: inherit;
+}
+
+.input-field input:focus {
+  outline: none;
+  border-color: rgba(210, 170, 97, 0.6);
+  box-shadow: 0 0 0 2px rgba(210, 170, 97, 0.2);
+}
+
+.menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.character-card {
+  text-align: left;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 20%),
+    var(--panel-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.character-card.selected {
+  border-color: rgba(210, 170, 97, 0.6);
+  box-shadow: 0 0 0 1px rgba(210, 170, 97, 0.2);
+}
+
+.menu-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.error-banner {
+  border: 1px solid rgba(189, 93, 78, 0.45);
+  background: rgba(189, 93, 78, 0.12);
+  color: #f2d0c9;
+  padding: 10px 12px;
+  border-radius: 12px;
 }

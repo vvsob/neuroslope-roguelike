@@ -14,6 +14,10 @@ aiosqlite = "^0.22.1"
 uvicorn = "^0.41.0"
 greenlet = "^3.3.2"
 sqladmin = "^0.23.0"
+websockets = "^16.0"
+google-generativeai = ">=0.8"
+google-genai = ">=1.10"
+pillow = ">=10.2"
 
 
 [build-system]

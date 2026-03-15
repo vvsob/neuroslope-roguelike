@@ -3,6 +3,10 @@ from sqlalchemy import String, Integer, JSON, DateTime, ForeignKey, Boolean, Big
 from app.db.session import Base  # async declarative base
 from typing import Optional, List
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .game import GameUser
 
 
 class User(Base):
@@ -12,6 +16,11 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(50))
 
     auth_tokens: Mapped[List["AuthToken"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    game_users: Mapped[list["GameUser"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan"
     )

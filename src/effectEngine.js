@@ -131,6 +131,122 @@ function executeEffect(state, effect, context) {
     for (let index = 0; index < amount; index += 1) {
       state.player[zone].push(effect.cardId);
     }
+    return;
+  }
+
+  // ── Extended effect primitives ──────────────────────────────────────────────
+
+  // multiHit: deal damage N times, each hit optionally escalated
+  // {"type":"multiHit","hits":3,"amount":5,"escalate":1.5,"useCombatModifiers":true}
+  if (effect.type === "multiHit") {
+    const targets = resolveTargetUnits(state, effect.target ?? "opponent", context);
+    if (targets.length === 0) return;
+    const attacker = resolveTargetUnit(state, effect.sourceTarget ?? "self", context);
+    const hits = resolveNumericValue(effect.hits ?? 2, state, context);
+    const escalate = typeof effect.escalate === "number" ? effect.escalate : 1;
+    let amount = resolveNumericValue(effect.amount, state, context);
+    for (let i = 0; i < hits; i++) {
+      const dmg = effect.useCombatModifiers && attacker
+        ? calculateDamageWithModifiers({ amount: Math.floor(amount), attacker, defender: targets[0] })
+        : Math.floor(amount);
+      for (const target of targets) {
+        context.absorbDamage?.(target, dmg);
+      }
+      amount *= escalate;
+    }
+    return;
+  }
+
+  // splitDamage: divide total damage evenly across all alive enemies
+  // {"type":"splitDamage","amount":18,"useCombatModifiers":true}
+  if (effect.type === "splitDamage") {
+    const enemies = getAliveEnemies(state);
+    if (enemies.length === 0) return;
+    const attacker = resolveTargetUnit(state, "self", context);
+    const total = resolveNumericValue(effect.amount, state, context);
+    const perTarget = Math.max(1, Math.floor(total / enemies.length));
+    for (const target of enemies) {
+      const dmg = effect.useCombatModifiers && attacker
+        ? calculateDamageWithModifiers({ amount: perTarget, attacker, defender: target })
+        : perTarget;
+      context.absorbDamage?.(target, dmg);
+    }
+    return;
+  }
+
+  // lifesteal: deal damage and heal self for a fraction of damage dealt
+  // {"type":"lifesteal","amount":10,"steal":0.5,"useCombatModifiers":true}
+  if (effect.type === "lifesteal") {
+    const targets = resolveTargetUnits(state, effect.target ?? "opponent", context);
+    if (targets.length === 0) return;
+    const attacker = resolveTargetUnit(state, "self", context);
+    let baseAmount = resolveNumericValue(effect.amount, state, context);
+    let totalDealt = 0;
+    for (const target of targets) {
+      const dmg = effect.useCombatModifiers && attacker
+        ? calculateDamageWithModifiers({ amount: baseAmount, attacker, defender: target })
+        : baseAmount;
+      const hpBefore = target.hp;
+      context.absorbDamage?.(target, dmg);
+      totalDealt += hpBefore - target.hp;
+    }
+    const healAmount = Math.floor(totalDealt * (effect.steal ?? 0.5));
+    if (healAmount > 0) {
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + healAmount);
+    }
+    return;
+  }
+
+  // execute: instantly kill target if hp < threshold (flat or percent)
+  // {"type":"execute","threshold":15} or {"type":"execute","thresholdPercent":20}
+  if (effect.type === "execute") {
+    const targets = resolveTargetUnits(state, effect.target ?? "opponent", context);
+    for (const target of targets) {
+      const threshold = effect.thresholdPercent != null
+        ? Math.floor(target.maxHp * effect.thresholdPercent / 100)
+        : resolveNumericValue(effect.threshold ?? 0, state, context);
+      if (target.hp <= threshold) {
+        target.hp = 0;
+      }
+    }
+    return;
+  }
+
+  // echo: re-apply the onPlay effects of the last played card (stored in context)
+  // {"type":"echo"}
+  if (effect.type === "echo") {
+    const lastCard = context.lastPlayedCard;
+    if (!lastCard) return;
+    for (const behavior of lastCard.behaviors ?? []) {
+      if (behavior.trigger === "onPlay") {
+        executeEffects(state, behavior.effects ?? [], { ...context, lastPlayedCard: null });
+      }
+    }
+    return;
+  }
+
+  // exhaustRandom: exhaust N random cards from hand
+  // {"type":"exhaustRandom","amount":1}
+  if (effect.type === "exhaustRandom") {
+    const amount = resolveNumericValue(effect.amount ?? 1, state, context);
+    for (let i = 0; i < amount; i++) {
+      if (state.player.hand.length === 0) break;
+      const idx = Math.floor(Math.random() * state.player.hand.length);
+      const [cardId] = state.player.hand.splice(idx, 1);
+      state.player.exhaustPile.push(cardId);
+    }
+    return;
+  }
+
+  // gainBlock: alias so LLM can write it more naturally
+  // {"type":"gainBlock","amount":8}
+  if (effect.type === "gainBlock") {
+    const targets = resolveTargetUnits(state, effect.target ?? "self", context);
+    const amount = resolveNumericValue(effect.amount, state, context);
+    for (const t of targets) {
+      t.block = (t.block ?? 0) + amount;
+    }
+    return;
   }
 }
 
@@ -140,24 +256,24 @@ function evaluateCondition(state, condition, context) {
   }
 
   const target = resolveTargetUnit(state, condition.target, context);
-  const current = target?.[condition.stat];
-  const value = resolveNumericValue(condition.value, state, context);
+  const current = target?.[condition.stat] ?? 0;
 
-  if (condition.operator === "gt") {
-    return current > value;
+  // valuePercent: compare stat as % of maxHp (or maxEnergy)
+  let value;
+  if (condition.valuePercent != null) {
+    const maxStat = condition.stat === "energy"
+      ? (target?.maxEnergy ?? 3)
+      : (target?.maxHp ?? 1);
+    value = Math.floor(maxStat * condition.valuePercent / 100);
+  } else {
+    value = resolveNumericValue(condition.value, state, context);
   }
-  if (condition.operator === "gte") {
-    return current >= value;
-  }
-  if (condition.operator === "lt") {
-    return current < value;
-  }
-  if (condition.operator === "lte") {
-    return current <= value;
-  }
-  if (condition.operator === "eq") {
-    return current === value;
-  }
+
+  if (condition.operator === "gt") return current > value;
+  if (condition.operator === "gte") return current >= value;
+  if (condition.operator === "lt") return current < value;
+  if (condition.operator === "lte") return current <= value;
+  if (condition.operator === "eq") return current === value;
   return false;
 }
 
@@ -167,11 +283,17 @@ function resolveNumericValue(value, state, context) {
   }
 
   if (typeof value === "string") {
-    if (value === "cardsInHand") {
-      return state.player.hand.length;
-    }
-    if (value === "playerStrength") {
-      return state.player.strength;
+    if (value === "cardsInHand") return state.player.hand.length;
+    if (value === "playerStrength") return state.player.strength ?? 0;
+    if (value === "playerMissingHp") return state.player.maxHp - state.player.hp;
+    if (value === "playerHpPercent") return Math.floor((state.player.hp / state.player.maxHp) * 100);
+    if (value === "enemyCount") return getAliveEnemies(state).length;
+    if (value === "deckSize") return state.player.deck?.length ?? 0;
+    if (value === "discardSize") return state.player.discardPile?.length ?? 0;
+    // "targetMissingHp": missing HP of the selected/primary enemy
+    if (value === "targetMissingHp") {
+      const enemy = getPrimaryEnemy(state, context ?? {});
+      return enemy ? enemy.maxHp - enemy.hp : 0;
     }
   }
 
