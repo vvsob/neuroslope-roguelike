@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqladmin import Admin, ModelView
 
 from app.crud.user import UserCRUD
@@ -47,3 +51,19 @@ for model_class in Base.__subclasses__():
 app.include_router(auth_router)
 app.include_router(lobby_router)
 app.include_router(game_router)
+
+# ── Frontend hosting (same port) ─────────────────────────────────────────────
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+INDEX_PATH = REPO_ROOT / "index.html"
+SRC_DIR = REPO_ROOT / "src"
+
+if SRC_DIR.exists():
+    app.mount("/src", StaticFiles(directory=SRC_DIR), name="src")
+
+
+@app.get("/", include_in_schema=False)
+async def serve_index():
+    if INDEX_PATH.exists():
+        return FileResponse(INDEX_PATH)
+    return {"error": "index.html not found"}
