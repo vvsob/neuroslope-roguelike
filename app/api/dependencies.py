@@ -20,6 +20,9 @@ async def get_current_user(
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
 
+    if not token and conn.scope.get("type") == "websocket":
+        token = conn.query_params.get("token")
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,4 +46,3 @@ async def get_current_user(
         )
 
     return auth_record.user
-

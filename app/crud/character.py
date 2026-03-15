@@ -18,6 +18,7 @@ class CharacterCRUD:
             {
                 "id": character.id,
                 "name": character.name,
+                "health": character.health,
             }
             for character in characters
         ]

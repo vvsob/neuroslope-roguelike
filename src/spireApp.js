@@ -110,6 +110,98 @@ const MAP_TEMPLATE = [
   { id: "n6", type: "boss", label: "Boss" },
 ];
 
+export function createGameRenderer(root, { onAction } = {}) {
+  if (!root) {
+    return null;
+  }
+
+  let state = null;
+  let animationTimeoutId = null;
+
+  function setState(nextState, { fx = [], sfx = [] } = {}) {
+    if (nextState) {
+      state = typeof structuredClone === "function"
+        ? structuredClone(nextState)
+        : JSON.parse(JSON.stringify(nextState));
+    } else {
+      state = nextState;
+    }
+    render();
+
+    if (sfx.length > 0) {
+      for (const sound of sfx) {
+        playSfx(sound);
+      }
+    }
+
+    if (fx.length > 0) {
+      triggerFx(fx);
+    }
+
+    scheduleCardAnimationCleanup();
+  }
+
+  function render() {
+    if (!state) {
+      root.innerHTML = `
+        <div class="boot-card">
+          <p class="eyebrow">Neuroslope</p>
+          <h1>Connecting...</h1>
+          <p class="muted">Waiting for the spire to respond.</p>
+        </div>
+      `;
+      return;
+    }
+
+    root.innerHTML = renderApp(state);
+    bindEvents();
+  }
+
+  function bindEvents() {
+    for (const button of root.querySelectorAll("[data-action]")) {
+      button.addEventListener("click", () => {
+        const action = button.dataset.action;
+        const id = button.dataset.id;
+
+        if (action === "toggle-sfx") {
+          SFX.toggle();
+          render();
+          return;
+        }
+
+        if (onAction) {
+          onAction(action, id);
+        }
+      });
+    }
+  }
+
+  function scheduleCardAnimationCleanup() {
+    if (animationTimeoutId) {
+      clearTimeout(animationTimeoutId);
+      animationTimeoutId = null;
+    }
+
+    if (!state?.cardAnimation) {
+      return;
+    }
+
+    animationTimeoutId = window.setTimeout(() => {
+      if (!state) {
+        return;
+      }
+      state.cardAnimation = null;
+      render();
+    }, 720);
+  }
+
+  return {
+    setState,
+    render,
+    getState: () => state,
+  };
+}
+
 export function mountApp(root) {
   if (!root) {
     return;
