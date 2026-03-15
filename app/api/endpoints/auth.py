@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel
 from app.schemas.user import UserRegistration
 from app.crud.user import UserCRUD
