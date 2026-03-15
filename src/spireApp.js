@@ -329,8 +329,7 @@ function renderTopBar(state) {
         <p class="eyebrow">Encounter</p>
         <h3>${describeEncounterHeadline(state)}</h3>
         <p class="muted">${state.enemies.length > 0 ? "Battle in progress" : "Choose the next room on the map."}</p>
-        <!-- [SFX] Sound toggle -->
-        <button class="button-muted" style="margin-top:8px;padding:5px 10px;font-size:0.8rem;border-radius:12px;" data-action="toggle-sfx">
+        <button class="button-muted topbar-toggle" data-action="toggle-sfx">
           ${SFX.enabled ? "🔊 Sound on" : "🔇 Sound off"}
         </button>
       </div>
@@ -357,42 +356,22 @@ function renderBattle(state) {
       </section>
       <section class="battle-hud">
         <div class="hand-panel">
-          <div class="hand-backdrop"></div>
           <div class="hand-shell">
-            <div class="hand-head">
-              <div class="hand-title">
-                <h3>Hand</h3>
-                <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
-                  <span>${state.player.energy}</span>
-                </div>
-              </div>
-              <p class="muted">Single-target cards hit the selected enemy. If none is selected, they hit the front enemy.</p>
-            </div>
             <div class="hand-row">
               ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
             </div>
           </div>
         </div>
-        <div class="battle-sidepanel control-card">
+        <div class="battle-sidepanel">
           <p class="eyebrow">Turn</p>
-          <h3>Energy ${state.player.energy}/${state.player.maxEnergy}</h3>
-          <p class="muted">Hand ${state.player.hand.length} | Draw ${state.player.drawPile.length}</p>
-          <p class="muted">Discard ${state.player.discardPile.length} | Exhaust ${state.player.exhaustPile.length}</p>
+          <div class="turn-energy">
+            <h3>Energy ${state.player.energy}/${state.player.maxEnergy}</h3>
+            <div class="energy-orb ${state.player.energy === 0 ? "empty" : ""}" aria-label="Current energy">
+              <span>${state.player.energy}</span>
+            </div>
+          </div>
+          <p class="muted">Hand ${state.player.hand.length}</p>
           <button class="button-primary end-turn-button" data-action="end-turn">End Turn</button>
-        </div>
-        <div class="battle-deckbar">
-          <div class="stat-card">
-            <p class="eyebrow">Draw</p>
-            <h3>${state.player.drawPile.length}</h3>
-          </div>
-          <div class="stat-card">
-            <p class="eyebrow">Discard</p>
-            <h3>${state.player.discardPile.length}</h3>
-          </div>
-          <div class="stat-card">
-            <p class="eyebrow">Exhaust</p>
-            <h3>${state.player.exhaustPile.length}</h3>
-          </div>
         </div>
       </section>
     </section>
