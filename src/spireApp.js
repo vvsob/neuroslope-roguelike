@@ -1,110 +1,11 @@
-const STARTING_DECK = [
-  "strike",
-  "strike",
-  "strike",
-  "strike",
-  "defend",
-  "defend",
-  "defend",
-  "defend",
-  "bash",
-  "focus",
-];
-
-const CARD_LIBRARY = {
-  strike: {
-    id: "strike",
-    name: "Strike",
-    cost: 1,
-    type: "Attack",
-    description: "Deal 6 damage.",
-    play(state) {
-      dealDamage(state, 6);
-      return "You slash for 6.";
-    },
-  },
-  defend: {
-    id: "defend",
-    name: "Defend",
-    cost: 1,
-    type: "Skill",
-    description: "Gain 5 block.",
-    play(state) {
-      state.player.block += 5;
-      return "You brace for 5 block.";
-    },
-  },
-  bash: {
-    id: "bash",
-    name: "Bash",
-    cost: 2,
-    type: "Attack",
-    description: "Deal 8 damage. Apply 2 Vulnerable.",
-    play(state) {
-      dealDamage(state, 8);
-      state.enemy.vulnerable += 2;
-      return "You bash for 8 and apply Vulnerable.";
-    },
-  },
-  focus: {
-    id: "focus",
-    name: "Focus",
-    cost: 1,
-    type: "Skill",
-    description: "Gain 2 Strength this combat.",
-    play(state) {
-      state.player.strength += 2;
-      return "Your stance sharpens. Gain 2 Strength.";
-    },
-  },
-  quick_slash: {
-    id: "quick_slash",
-    name: "Quick Slash",
-    cost: 1,
-    type: "Attack",
-    description: "Deal 7 damage. Draw 1 card.",
-    play(state) {
-      dealDamage(state, 7);
-      drawCards(state, 1);
-      return "Quick Slash hits for 7 and cycles your hand.";
-    },
-  },
-  iron_shell: {
-    id: "iron_shell",
-    name: "Iron Shell",
-    cost: 1,
-    type: "Skill",
-    description: "Gain 7 block. Gain 1 block next turn.",
-    play(state) {
-      state.player.block += 7;
-      state.player.metallicize += 1;
-      return "Iron Shell grants 7 block and lasting plating.";
-    },
-  },
-  cleave: {
-    id: "cleave",
-    name: "Cleave",
-    cost: 1,
-    type: "Attack",
-    description: "Deal 9 damage.",
-    play(state) {
-      dealDamage(state, 9);
-      return "Cleave tears through the enemy for 9.";
-    },
-  },
-  second_wind: {
-    id: "second_wind",
-    name: "Second Wind",
-    cost: 1,
-    type: "Skill",
-    description: "Heal 4 HP. Exhaust.",
-    exhaust: true,
-    play(state) {
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 4);
-      return "You recover 4 HP.";
-    },
-  },
-};
+import { CARD_LIBRARY, CARD_REWARD_POOL, STARTING_DECK } from "./data/cards.js";
+import { RELIC_LIBRARY, TREASURE_RELIC_POOL } from "./data/relics.js";
+import {
+  describeRelic,
+  hasKeyword,
+  triggerCardEvent,
+  triggerRelicEvent,
+} from "./effectEngine.js";
 
 const ENCOUNTERS = {
   hallway: [
@@ -191,7 +92,7 @@ export function mountApp(root) {
     }
 
     if (action === "play-card") {
-      setState((draft) => playCard(draft, id));
+      setState((draft) => playCard(draft, Number(id)));
       return;
     }
 
@@ -224,10 +125,9 @@ export function mountApp(root) {
 
     if (action === "take-relic") {
       setState((draft) => {
-        draft.player.maxEnergy += 1;
-        draft.player.energy = draft.player.maxEnergy;
-        addLog(draft, "You claim a humming core. Max energy increases by 1.");
+        grantRelic(draft, draft.pendingRelicRewardId);
         completeCurrentNode(draft);
+        draft.pendingRelicRewardId = null;
         draft.screen = "map";
       });
       return;
@@ -268,7 +168,9 @@ function createInitialState() {
       discardPile: [],
       hand: [],
       exhaustPile: [],
+      relics: [],
     },
+    pendingRelicRewardId: null,
     enemy: null,
     rewardOptions: [],
     log: ["A new ascent begins. Choose your route."],
@@ -315,7 +217,7 @@ function renderTopBar(state) {
       <div class="top-pill">
         <p class="eyebrow">${state.player.name}</p>
         <h3>HP ${state.player.hp}/${state.player.maxHp}</h3>
-        <p class="muted">Energy ${state.player.energy}/${state.player.maxEnergy} | Strength ${state.player.strength}</p>
+        <p class="muted">Energy ${state.player.energy}/${state.player.maxEnergy} | Relics ${state.player.relics.length}</p>
       </div>
       <div class="top-pill">
         <p class="eyebrow">Encounter</p>
@@ -356,7 +258,7 @@ function renderBattle(state) {
       <div class="hand-panel control-card">
         <div class="hand-head">
           <h3>Hand</h3>
-          <p class="muted">Energy spent wisely wins climbs.</p>
+          <p class="muted">Data-driven cards can react to many events.</p>
         </div>
         <div class="hand-row">
           ${state.player.hand.map((cardId, index) => renderCard(cardId, state, index)).join("")}
@@ -368,7 +270,7 @@ function renderBattle(state) {
 
 function renderCard(cardId, state, index) {
   const card = CARD_LIBRARY[cardId];
-  const disabled = state.player.energy < card.cost || state.outcome;
+  const disabled = !card || state.player.energy < card.cost || state.outcome;
   return `
     <button class="card" data-action="play-card" data-id="${index}" ${disabled ? "disabled" : ""}>
       <div class="card-top">
@@ -379,7 +281,7 @@ function renderCard(cardId, state, index) {
         <h3>${card.name}</h3>
         <p class="card-description">${card.description}</p>
       </div>
-      <p class="card-foot">${card.exhaust ? "Exhausts after play" : "Returns to discard pile"}</p>
+      <p class="card-foot">${hasKeyword(card, "exhaust") ? "Exhausts after play" : card.rarity}</p>
     </button>
   `;
 }
@@ -398,12 +300,7 @@ function nodeGlyph(type) {
 function renderIntent(intent) {
   const info = describeIntent(intent);
   return `
-    <div
-      class="intent-icon"
-      data-tooltip-title="${info.name}"
-      data-tooltip-desc="${info.description}"
-      aria-label="${info.name}"
-    >
+    <div class="intent-icon" data-tooltip-title="${info.name}" data-tooltip-desc="${info.description}" aria-label="${info.name}">
       ${info.icon}
       <span class="intent-count">${info.count}</span>
     </div>
@@ -442,11 +339,7 @@ function renderEffects(unit) {
       ${effects
         .map(
           (effect) => `
-            <span
-              class="effect-icon"
-              data-tooltip-title="${effect.name}"
-              data-tooltip-desc="${effect.description}"
-            >
+            <span class="effect-icon" data-tooltip-title="${effect.name}" data-tooltip-desc="${effect.description}">
               ${effect.icon}
               <span class="effect-stack">${effect.value}</span>
             </span>
@@ -459,36 +352,11 @@ function renderEffects(unit) {
 
 function collectEffects(unit) {
   const effectMap = [
-    {
-      key: "block",
-      icon: "B",
-      name: "Block",
-      describe: (value) => `Prevents the next ${value} damage taken this turn.`,
-    },
-    {
-      key: "strength",
-      icon: "S",
-      name: "Strength",
-      describe: (value) => `Adds ${value} damage to attack cards and enemy attacks.`,
-    },
-    {
-      key: "weak",
-      icon: "W",
-      name: "Weak",
-      describe: (value) => `Attacks deal reduced damage for ${value} more turns.`,
-    },
-    {
-      key: "vulnerable",
-      icon: "V",
-      name: "Vulnerable",
-      describe: (value) => `Incoming attacks deal extra damage for ${value} more turns.`,
-    },
-    {
-      key: "metallicize",
-      icon: "M",
-      name: "Metallicize",
-      describe: (value) => `Gain ${value} block at the start of each turn.`,
-    },
+    { key: "block", icon: "B", name: "Block", describe: (value) => `Prevents the next ${value} damage taken this turn.` },
+    { key: "strength", icon: "S", name: "Strength", describe: (value) => `Adds ${value} damage to attacks.` },
+    { key: "weak", icon: "W", name: "Weak", describe: (value) => `Attacks deal reduced damage for ${value} more turns.` },
+    { key: "vulnerable", icon: "V", name: "Vulnerable", describe: (value) => `Incoming attacks deal extra damage for ${value} more turns.` },
+    { key: "metallicize", icon: "M", name: "Metallicize", describe: (value) => `Gain ${value} block at the start of each turn.` },
   ];
 
   return effectMap
@@ -503,22 +371,17 @@ function collectEffects(unit) {
 
 function describeIntent(intent) {
   if (!intent) {
-    return { icon: "?", name: "Unknown Intent", description: "The enemy's next action is unclear." };
+    return { icon: "?", name: "Unknown Intent", count: "", description: "The enemy's next action is unclear." };
   }
-
   if (intent.type === "attack") {
     const repeats = intent.repeats ?? 1;
     return {
       icon: repeats > 1 ? "⚔" : "🗡",
       name: "Attack",
       count: repeats > 1 ? `${intent.value}x${repeats}` : `${intent.value}`,
-      description:
-        repeats > 1
-          ? `Will attack ${repeats} times for ${intent.value} base damage each.`
-          : `Will attack for ${intent.value} base damage.`,
+      description: repeats > 1 ? `Will attack ${repeats} times for ${intent.value} base damage each.` : `Will attack for ${intent.value} base damage.`,
     };
   }
-
   if (intent.type === "attackBlock") {
     return {
       icon: "🛡",
@@ -527,7 +390,6 @@ function describeIntent(intent) {
       description: `Will attack for ${intent.value} base damage and gain ${intent.block} block.`,
     };
   }
-
   if (intent.type === "buff") {
     return {
       icon: "▲",
@@ -536,7 +398,6 @@ function describeIntent(intent) {
       description: `Will gain ${intent.strength ?? 0} Strength and ${intent.block ?? 0} block.`,
     };
   }
-
   if (intent.type === "debuff") {
     return {
       icon: "☠",
@@ -545,13 +406,7 @@ function describeIntent(intent) {
       description: `Will apply ${intent.weak ?? 0} Weak and ${intent.vulnerable ?? 0} Vulnerable.`,
     };
   }
-
-  return {
-    icon: "?",
-    name: intent.label,
-    count: "",
-    description: "The enemy is preparing something unusual.",
-  };
+  return { icon: "?", name: intent.label, count: "", description: "The enemy is preparing something unusual." };
 }
 
 function renderNonBattle(state) {
@@ -587,6 +442,20 @@ function renderNonBattle(state) {
           <p>HP ${state.player.hp}/${state.player.maxHp}</p>
           <p>Energy ${state.player.maxEnergy}</p>
           <p>Deck ${state.player.deck.length} cards</p>
+          <p>Relics ${state.player.relics.length}</p>
+        </div>
+        <div class="control-card">
+          <p class="eyebrow">Relics</p>
+          ${
+            state.player.relics.length === 0
+              ? `<p class="muted">No relics yet.</p>`
+              : state.player.relics
+                  .map((relicId) => {
+                    const relic = describeRelic(relicId);
+                    return `<p>${relic.icon} ${relic.name}</p>`;
+                  })
+                  .join("")
+          }
         </div>
         <div class="control-card">
           <p class="eyebrow">Recent Log</p>
@@ -648,12 +517,13 @@ function renderOverlay(state) {
   }
 
   if (state.screen === "treasure") {
+    const relic = state.pendingRelicRewardId ? RELIC_LIBRARY[state.pendingRelicRewardId] : null;
     return `
       <div class="overlay">
         <div class="overlay-card">
           <p class="eyebrow">Treasure</p>
-          <h2>Humming Core</h2>
-          <p>Gain 1 max energy for the rest of the run.</p>
+          <h2>${relic?.name ?? "Relic"}</h2>
+          <p>${relic?.description ?? "A strange treasure hums in the dark."}</p>
           <button class="button-primary" data-action="take-relic">Take relic</button>
         </div>
       </div>
@@ -692,7 +562,6 @@ function describeScreen(state) {
   if (state.outcome === "defeat") {
     return "Run failed";
   }
-
   const nextNode = state.mapNodes.find((node) => node.available && !node.completed);
   return nextNode ? `Next stop: ${nextNode.label}` : "The path is clear";
 }
@@ -702,11 +571,9 @@ function describeHint(state) {
   if (!nextNode) {
     return "The prototype run is complete.";
   }
-
   if (nextNode.type === "boss") {
     return "One final battle waits at the top.";
   }
-
   return "Pick the highlighted node to continue climbing.";
 }
 
@@ -723,15 +590,13 @@ function travelToNode(state, id) {
     startBattle(state, node.type);
     return;
   }
-
   if (node.type === "campfire") {
     state.screen = "campfire";
     return;
   }
-
   if (node.type === "treasure") {
+    state.pendingRelicRewardId = pickRelicReward(state);
     state.screen = "treasure";
-    return;
   }
 }
 
@@ -758,6 +623,7 @@ function startBattle(state, type) {
   state.player.vulnerable = 0;
   state.screen = "battle";
   state.battle = { type };
+  triggerRelicEvent(state, "onBattleStart", battleContext(state));
   drawCards(state, 5);
   addLog(state, `${state.enemy.name} appears with intent: ${state.enemy.intent.label}.`);
 }
@@ -766,7 +632,6 @@ function playCard(state, index) {
   if (state.screen !== "battle" || state.outcome) {
     return;
   }
-
   const cardId = state.player.hand[index];
   const card = CARD_LIBRARY[cardId];
   if (!card || card.cost > state.player.energy) {
@@ -775,15 +640,14 @@ function playCard(state, index) {
 
   state.player.energy -= card.cost;
   state.player.hand.splice(index, 1);
-  const message = card.play(state);
+  triggerCardEvent(state, card, "onPlay", battleContext(state, card));
+  triggerRelicEvent(state, "onCardPlayed", battleContext(state, card));
 
-  if (card.exhaust) {
+  if (hasKeyword(card, "exhaust")) {
     state.player.exhaustPile.push(cardId);
   } else {
     state.player.discardPile.push(cardId);
   }
-
-  addLog(state, message);
 
   if (state.enemy.hp <= 0) {
     winBattle(state);
@@ -795,16 +659,18 @@ function endTurn(state) {
     return;
   }
 
+  triggerRelicEvent(state, "onTurnEnd", battleContext(state));
   state.player.discardPile.push(...state.player.hand);
   state.player.hand = [];
   runEnemyIntent(state);
-
   if (state.outcome === "defeat") {
+    triggerRelicEvent(state, "onBattleEnd", { ...battleContext(state), result: "defeat" });
     return;
   }
 
   state.player.block = state.player.metallicize;
   state.player.energy = state.player.maxEnergy;
+  triggerRelicEvent(state, "onTurnStart", battleContext(state));
   tickDownStatus(state.player);
   tickDownStatus(state.enemy);
   advanceEnemyIntent(state.enemy);
@@ -820,7 +686,7 @@ function runEnemyIntent(state) {
 
   if (intent.type === "attack" || intent.type === "attackBlock") {
     const repeats = intent.repeats ?? 1;
-    for (let i = 0; i < repeats; i += 1) {
+    for (let index = 0; index < repeats; index += 1) {
       const damage = adjustedDamage(intent.value + state.enemy.strength, state.enemy.weak, state.player.vulnerable);
       absorbDamage(state.player, damage);
       addLog(state, `${state.enemy.name} hits for ${damage}.`);
@@ -835,13 +701,11 @@ function runEnemyIntent(state) {
   if (intent.type === "attackBlock" && intent.block) {
     state.enemy.block += intent.block;
   }
-
   if (intent.type === "buff") {
     state.enemy.strength += intent.strength ?? 0;
     state.enemy.block += intent.block ?? 0;
     addLog(state, `${state.enemy.name} grows stronger.`);
   }
-
   if (intent.type === "debuff") {
     state.player.weak += intent.weak ?? 0;
     state.player.vulnerable += intent.vulnerable ?? 0;
@@ -858,6 +722,7 @@ function winBattle(state) {
   state.screen = "map";
   state.mapNodes[state.floor - 1].completed = true;
   unlockNextNode(state);
+  triggerRelicEvent(state, "onBattleEnd", { ...battleContext(state), result: "victory" });
 
   if (state.battle?.type === "boss") {
     state.outcome = "victory";
@@ -884,18 +749,8 @@ function completeCurrentNode(state) {
   if (!node) {
     return;
   }
-
   node.completed = true;
   unlockNextNode(state);
-}
-
-function dealDamage(state, baseAmount) {
-  const damage = adjustedDamage(
-    baseAmount + state.player.strength,
-    state.player.weak,
-    state.enemy.vulnerable,
-  );
-  absorbDamage(state.enemy, damage);
 }
 
 function adjustedDamage(amount, weak, targetVulnerable) {
@@ -926,7 +781,7 @@ function advanceEnemyIntent(enemy) {
 }
 
 function drawCards(state, amount) {
-  for (let i = 0; i < amount; i += 1) {
+  for (let index = 0; index < amount; index += 1) {
     if (state.player.drawPile.length === 0) {
       if (state.player.discardPile.length === 0) {
         return;
@@ -935,16 +790,46 @@ function drawCards(state, amount) {
       state.player.discardPile = [];
     }
 
-    const nextCard = state.player.drawPile.pop();
-    if (nextCard) {
-      state.player.hand.push(nextCard);
+    const nextCardId = state.player.drawPile.pop();
+    if (!nextCardId) {
+      continue;
     }
+
+    const card = CARD_LIBRARY[nextCardId];
+    state.player.hand.push(nextCardId);
+    triggerCardEvent(state, card, "onDraw", battleContext(state, card));
+    triggerRelicEvent(state, "onCardDrawn", battleContext(state, card));
   }
 }
 
 function pickRewardCards(deck) {
-  const pool = Object.keys(CARD_LIBRARY).filter((cardId) => !STARTING_DECK.includes(cardId) || deck.length > 9);
+  const pool = CARD_REWARD_POOL.filter((cardId) => !deck.includes(cardId) || deck.length > 9);
   return shuffle(pool).slice(0, 3);
+}
+
+function pickRelicReward(state) {
+  const available = TREASURE_RELIC_POOL.filter((relicId) => !state.player.relics.includes(relicId));
+  return shuffle(available.length > 0 ? available : TREASURE_RELIC_POOL)[0];
+}
+
+function grantRelic(state, relicId) {
+  const relic = RELIC_LIBRARY[relicId];
+  if (!relic) {
+    return;
+  }
+  if (!state.player.relics.includes(relicId)) {
+    state.player.relics.push(relicId);
+  }
+  addLog(state, `You claim ${relic.name}.`);
+}
+
+function battleContext(state, card = null) {
+  return {
+    state,
+    card,
+    absorbDamage,
+    drawCards,
+  };
 }
 
 function addLog(state, message) {
