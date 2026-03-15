@@ -265,20 +265,16 @@ async function startNewGame() {
     }
 
     // Ask the LLM to generate this run's content before connecting.
-    // On failure we fall back to static content gracefully.
+    app.loadingMessage = "Оракул плетёт твою судьбу...";
+    render();
     try {
-      app.loadingMessage = "Оракул плетёт твою судьбу...";
-      render();
       const genResult = await apiRequest(`/game/generate/${response.id}`, { method: "POST" });
       if (genResult?.theme) {
         app.loadingMessage = `${genResult.theme}...`;
         render();
       }
     } catch (genError) {
-      // Non-fatal: static content will be used
-      console.warn("LLM generation skipped:", genError?.message);
-      app.loadingMessage = "Подключение к башне...";
-      render();
+      throw new Error("Оракул недоступен — слишком много запросов. Подожди минуту и попробуй снова.");
     }
 
     connectToGame(response.id);
@@ -298,7 +294,7 @@ function connectToGame(lobbyId) {
     return;
   }
 
-  app.loadingMessage = "Connecting to spire...";
+  app.loadingMessage = "Подключение к башне...";
   app.screen = "boot";
   render();
 
@@ -331,11 +327,15 @@ function connectToGame(lobbyId) {
   });
 
   ws.addEventListener("close", () => {
+    const intentional = app._intentionalDisconnect;
+    app._intentionalDisconnect = false;
     const wasInGame = app.screen === "game";
     cleanupSocket();
-    app.error = wasInGame
-      ? "Соединение потеряно. Вернись в меню и начни заново."
-      : "Не удалось подключиться к серверу.";
+    if (!intentional) {
+      app.error = wasInGame
+        ? "Соединение потеряно. Вернись в меню и начни заново."
+        : "Не удалось подключиться к серверу.";
+    }
     app.screen = "menu";
     render();
   });
@@ -350,6 +350,15 @@ function connectToGame(lobbyId) {
 }
 
 function sendGameAction(action, id) {
+  if (action === "go-menu") {
+    app._intentionalDisconnect = true;
+    cleanupSocket();
+    app.error = null;
+    app.screen = "menu";
+    render();
+    return;
+  }
+
   if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
     return;
   }

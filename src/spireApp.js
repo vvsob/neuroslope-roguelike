@@ -714,7 +714,7 @@ function renderNonBattle(state) {
         <p class="eyebrow">Ран завершён</p>
         <h2>Нейролит повержен</h2>
         <p>Башня покорена. Начни новый забег.</p>
-        <button class="button-primary" data-action="restart">Новый ран</button>
+        <button class="button-primary" data-action="go-menu">В меню</button>
       </section>
     `;
   }
@@ -855,7 +855,7 @@ function renderOverlay(state) {
           <p class="eyebrow">Поражение</p>
           <h2>Подъём закончен</h2>
           <p>На этот раз колода не выдержала.</p>
-          <button class="button-primary" data-action="restart">Попробовать снова</button>
+          <button class="button-primary" data-action="go-menu">Попробовать снова</button>
         </div>
       </div>
     `;
@@ -1124,7 +1124,7 @@ function runEnemyIntent(state) {
 }
 
 function winBattle(state) {
-  addLog(state, "The encounter is cleared.");
+  addLog(state, "Схватка завершена.");
   state.enemies = [];
   state.selectedEnemyId = null;
   state.player.block = 0;
@@ -1143,7 +1143,8 @@ function winBattle(state) {
 
 function claimReward(state, cardId) {
   state.player.deck.push(cardId);
-  addLog(state, `You add ${CARD_LIBRARY[cardId].name} to your deck.`);
+  const cardName = (state.cardCatalog?.[cardId] ?? CARD_LIBRARY[cardId])?.name ?? cardId;
+  addLog(state, `Карта «${cardName}» добавлена в колоду.`);
   state.rewardOptions = [];
   state.screen = "map";
 }

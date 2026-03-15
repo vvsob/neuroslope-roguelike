@@ -50,7 +50,9 @@ def _get_api_key() -> Optional[str]:
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
 
-def _call_gemini(prompt: str) -> str:
+def _call_gemini(prompt: str, retries: int = 3) -> str:
+    import time
+
     api_key = _get_api_key()
     if not api_key:
         raise RuntimeError(
@@ -61,20 +63,33 @@ def _call_gemini(prompt: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.9,
-            "maxOutputTokens": 4096,
+            "maxOutputTokens": 8192,
             "responseMimeType": "application/json",
         },
     }
 
-    resp = requests.post(
-        GEMINI_URL,
-        params={"key": api_key},
-        json=payload,
-        timeout=60,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    last_exc: Exception = RuntimeError("No attempts made")
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                GEMINI_URL,
+                params={"key": api_key},
+                json=payload,
+                timeout=90,
+            )
+            if resp.status_code == 429:
+                wait = 20 * (attempt + 1)
+                logger.warning("Gemini rate limited (attempt %d/%d), retrying in %ds…", attempt + 1, retries, wait)
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(5 * (attempt + 1))
+    raise last_exc
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
