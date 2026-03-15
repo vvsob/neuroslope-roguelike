@@ -142,6 +142,7 @@ async def _generate_one_async(prompt: str, negative_prompt: str, output_path: Pa
 async def generate_run_images(
     image_prompts: Dict[str, Dict[str, str]],
     cards: Optional[List[Dict[str, str]]] = None,
+    world_style: str = "",
 ) -> None:
     """
     Generate weapon and enemy images for a LLM-generated run.
@@ -184,7 +185,7 @@ async def generate_run_images(
         if output_path.exists():
             logger.debug("Skipping %s — already exists", output_path.name)
             continue
-        prompt = _build_card_prompt(card)
+        prompt = _build_card_prompt(card, world_style)
         tasks.append(asyncio.create_task(
             _safe_generate(prompt, CARD_NEGATIVE_PROMPT, output_path),
             name=f"card-{card_id}",
@@ -201,12 +202,13 @@ async def _safe_generate(prompt: str, neg: str, path: Path) -> None:
         logger.exception("Image generation failed for %s", path.name)
 
 
-def _build_card_prompt(card: Dict[str, str]) -> str:
+def _build_card_prompt(card: Dict[str, str], world_style: str = "") -> str:
     name = card.get("name") or card.get("id") or "Card"
     description = card.get("description") or ""
     card_type = card.get("type") or "Skill"
+    style_prefix = f"{world_style}, " if world_style else "dark sci-fi roguelike card art, "
     return (
-        f"fantasy action card illustration, {name}, {description}, "
-        f"type {card_type}, dark sci-fi roguelike card art, dramatic composition, painterly style, "
+        f"{style_prefix}fantasy action card illustration, {name}, {description}, "
+        f"type {card_type}, dramatic composition, painterly style, "
         "single subject, centered composition, readable silhouette, no text"
     )

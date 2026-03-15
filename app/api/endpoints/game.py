@@ -565,10 +565,11 @@ async def generate_run_for_lobby(
     # Start image generation in the background (non-blocking)
     image_prompts = generated_run.get("imagePrompts") or {}
     generated_cards = generated_run.get("cards") or []
+    world_style = generated_run.get("worldStyle", "")
     img_started = bool(image_prompts or generated_cards)
     if img_started:
         asyncio.create_task(
-            generate_run_images(image_prompts, generated_cards),
+            generate_run_images(image_prompts, generated_cards, world_style),
             name=f"imggen-lobby-{lobby_id}",
         )
 
@@ -628,6 +629,7 @@ def _public_state(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     s = copy.deepcopy(state)
     generated_run = s.pop("_generatedRun", None)
+    s.pop("_lastPlayedCard", None)
 
     # Build merged catalogs: static + generated (generated takes precedence)
     card_catalog: Dict[str, Any] = {}
@@ -959,6 +961,9 @@ def play_card(state: Dict[str, Any], index: int, rng: random.Random) -> Optional
 
     feedback = build_card_feedback(card, state)
 
+    # Store for echo effect before triggering (so echo sees the card being played)
+    prev_last = state.get("_lastPlayedCard")
+    state["_lastPlayedCard"] = card
     trigger_card_event(state, card, "onPlay", battle_context(state, rng, card))
     trigger_relic_event(state, "onCardPlayed", battle_context(state, rng, card))
 
@@ -1323,6 +1328,7 @@ def battle_context(state: Dict[str, Any], rng: random.Random, card: Optional[Dic
         "targetEnemyId": state.get("selectedEnemyId"),
         "absorbDamage": absorb_damage,
         "drawCards": lambda s, amount: draw_cards(s, amount, rng),
+        "lastPlayedCard": state.get("_lastPlayedCard"),
     }
 
 
@@ -1470,6 +1476,113 @@ def execute_effect(state: Dict[str, Any], effect: Dict[str, Any], context: Dict[
         amount = resolve_numeric_value(effect.get("amount", 1), state, context)
         for _ in range(amount):
             state["player"][zone].append(effect.get("cardId"))
+        return
+
+    # ── Extended effect primitives ────────────────────────────────────────────
+
+    if effect["type"] == "multiHit":
+        # Deal damage N times, each hit optionally escalated
+        # {"type":"multiHit","hits":3,"amount":5,"escalate":1.5,"useCombatModifiers":true}
+        targets = resolve_target_units(state, effect.get("target", "opponent"), context)
+        if not targets:
+            return
+        attacker = resolve_target_unit(state, effect.get("sourceTarget", "self"), context)
+        hits = resolve_numeric_value(effect.get("hits", 2), state, context)
+        escalate = float(effect.get("escalate", 1))
+        absorb_fn = context.get("absorbDamage")
+        amount = float(resolve_numeric_value(effect.get("amount"), state, context))
+        for _ in range(hits):
+            dmg = int(amount)
+            if effect.get("useCombatModifiers") and attacker:
+                dmg = calculate_damage_with_modifiers(dmg, attacker, targets[0])
+            for target in targets:
+                if absorb_fn:
+                    absorb_fn(target, dmg)
+            amount *= escalate
+        return
+
+    if effect["type"] == "splitDamage":
+        # Divide total damage evenly across all alive enemies
+        # {"type":"splitDamage","amount":18,"useCombatModifiers":true}
+        enemies = get_alive_enemies(state)
+        if not enemies:
+            return
+        attacker = resolve_target_unit(state, "self", context)
+        total = resolve_numeric_value(effect.get("amount"), state, context)
+        per_target = max(1, total // len(enemies))
+        absorb_fn = context.get("absorbDamage")
+        for target in enemies:
+            dmg = calculate_damage_with_modifiers(per_target, attacker, target) if (effect.get("useCombatModifiers") and attacker) else per_target
+            if absorb_fn:
+                absorb_fn(target, dmg)
+        return
+
+    if effect["type"] == "lifesteal":
+        # Deal damage and heal player for a fraction
+        # {"type":"lifesteal","amount":10,"steal":0.5,"useCombatModifiers":true}
+        targets = resolve_target_units(state, effect.get("target", "opponent"), context)
+        if not targets:
+            return
+        attacker = resolve_target_unit(state, "self", context)
+        base_amount = resolve_numeric_value(effect.get("amount"), state, context)
+        absorb_fn = context.get("absorbDamage")
+        total_dealt = 0
+        for target in targets:
+            dmg = calculate_damage_with_modifiers(base_amount, attacker, target) if (effect.get("useCombatModifiers") and attacker) else base_amount
+            hp_before = target["hp"]
+            if absorb_fn:
+                absorb_fn(target, dmg)
+            total_dealt += hp_before - target["hp"]
+        steal = float(effect.get("steal", 0.5))
+        heal_amount = int(total_dealt * steal)
+        if heal_amount > 0:
+            player = state["player"]
+            player["hp"] = min(player["maxHp"], player["hp"] + heal_amount)
+        return
+
+    if effect["type"] == "execute":
+        # Instantly kill target if hp <= threshold
+        # {"type":"execute","thresholdPercent":20} or {"type":"execute","threshold":15}
+        targets = resolve_target_units(state, effect.get("target", "opponent"), context)
+        for target in targets:
+            if "thresholdPercent" in effect:
+                threshold = int(target.get("maxHp", 1) * effect["thresholdPercent"] / 100)
+            else:
+                threshold = resolve_numeric_value(effect.get("threshold", 0), state, context)
+            if target["hp"] <= threshold:
+                target["hp"] = 0
+        return
+
+    if effect["type"] == "echo":
+        # Re-apply onPlay effects of the last played card
+        last_card = context.get("lastPlayedCard")
+        if not last_card:
+            return
+        for behavior in (last_card.get("behaviors") or []):
+            if behavior.get("trigger") == "onPlay":
+                execute_effects(state, behavior.get("effects", []), {**context, "lastPlayedCard": None})
+        return
+
+    if effect["type"] == "exhaustRandom":
+        # Exhaust N random cards from hand
+        import random as _random
+        amount = resolve_numeric_value(effect.get("amount", 1), state, context)
+        hand = state["player"]["hand"]
+        for _ in range(amount):
+            if not hand:
+                break
+            idx = _random.randrange(len(hand))
+            card_id = hand.pop(idx)
+            state["player"]["exhaustPile"].append(card_id)
+        return
+
+    if effect["type"] == "gainBlock":
+        # Alias for modifyStat block — more readable for LLM output
+        targets = resolve_target_units(state, effect.get("target", "self"), context)
+        amount = resolve_numeric_value(effect.get("amount"), state, context)
+        for target in targets:
+            target["block"] = target.get("block", 0) + amount
+        return
 
 
 def evaluate_condition(state: Dict[str, Any], condition: Optional[Dict[str, Any]], context: Dict[str, Any]) -> bool:
@@ -1480,10 +1593,14 @@ def evaluate_condition(state: Dict[str, Any], condition: Optional[Dict[str, Any]
     if not target:
         return False
 
-    current = target.get(condition.get("stat"))
-    if current is None:
-        return False
-    value = resolve_numeric_value(condition.get("value"), state, context)
+    current = target.get(condition.get("stat"), 0)
+
+    if "valuePercent" in condition:
+        stat = condition.get("stat", "hp")
+        max_stat = target.get("maxEnergy", 3) if stat == "energy" else target.get("maxHp", 1)
+        value = int((max_stat or 1) * condition["valuePercent"] / 100)
+    else:
+        value = resolve_numeric_value(condition.get("value"), state, context)
 
     if condition.get("operator") == "gt":
         return current > value
@@ -1499,13 +1616,29 @@ def evaluate_condition(state: Dict[str, Any], condition: Optional[Dict[str, Any]
 
 
 def resolve_numeric_value(value: Any, state: Dict[str, Any], context: Dict[str, Any]) -> int:
-    if isinstance(value, int):
-        return value
+    if isinstance(value, (int, float)):
+        return int(value)
     if isinstance(value, str):
         if value == "cardsInHand":
             return len(state["player"].get("hand", []))
         if value == "playerStrength":
             return state["player"].get("strength", 0)
+        if value == "playerMissingHp":
+            p = state["player"]
+            return p.get("maxHp", 0) - p.get("hp", 0)
+        if value == "playerHpPercent":
+            p = state["player"]
+            max_hp = p.get("maxHp", 1) or 1
+            return int(p.get("hp", 0) * 100 / max_hp)
+        if value == "enemyCount":
+            return len(get_alive_enemies(state))
+        if value == "deckSize":
+            return len(state["player"].get("deck", []))
+        if value == "discardSize":
+            return len(state["player"].get("discardPile", []))
+        if value == "targetMissingHp":
+            enemy = get_primary_enemy(state, context)
+            return (enemy.get("maxHp", 0) - enemy.get("hp", 0)) if enemy else 0
     return 0
 
 
