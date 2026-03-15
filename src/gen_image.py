@@ -2,8 +2,6 @@ import argparse
 import os
 from pathlib import Path
 
-from huggingface_hub import InferenceClient
-
 from card_art_catalog import CARD_ART_CATALOG, CARD_NEGATIVE_PROMPT
 from level_art_catalog import (
     ENEMY_NEGATIVE_PROMPT,
@@ -24,18 +22,23 @@ def load_env_file(path: Path):
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def build_client() -> InferenceClient:
+def _get_api_key() -> str:
     repo_root = Path(__file__).resolve().parent.parent
     load_env_file(repo_root / ".env")
     load_env_file(repo_root / ".env.local")
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise RuntimeError("Set HF_TOKEN in the environment or in .env/.env.local before running image generation.")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        raise RuntimeError("Set GEMINI_API_KEY (or GOOGLE_API_KEY) in the environment or in .env/.env.local.")
+    return api_key
 
-    return InferenceClient(
-        provider="hf-inference",
-        api_key=hf_token,
-    )
+
+def build_client():
+    try:
+        from google import genai
+    except ImportError as exc:
+        raise RuntimeError("google-genai is not installed. Add it to your dependencies.") from exc
+
+    return genai.Client(api_key=_get_api_key())
 
 
 def iter_targets(level: str | None, kind: str):
@@ -51,16 +54,35 @@ def iter_targets(level: str | None, kind: str):
             yield card_id, "card", entry["prompt"], entry["path"], CARD_NEGATIVE_PROMPT
 
 
-def generate_image(client: InferenceClient, prompt: str, negative_prompt: str):
-    return client.text_to_image(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        model="stabilityai/stable-diffusion-xl-base-1.0",
-        width=1024,
-        height=1024,
-        num_inference_steps=20,
-        guidance_scale=12,
+def generate_image(client, prompt: str, negative_prompt: str):
+    from google.genai import types
+
+    model = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+    merged_prompt = f"{prompt}\n\nAvoid: {negative_prompt}"
+    response = client.models.generate_content(
+        model=model,
+        contents=[merged_prompt],
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE"],
+            image_config=types.ImageConfig(aspect_ratio="1:1"),
+        ),
     )
+
+    parts = getattr(response, "parts", None)
+    candidates = getattr(response, "candidates", None)
+    if not parts and candidates:
+        parts = candidates[0].content.parts
+
+    if not parts:
+        raise RuntimeError("Gemini returned no image parts.")
+
+    for part in parts:
+        inline = getattr(part, "inline_data", None)
+        if inline is None:
+            continue
+        return part.as_image()
+
+    raise RuntimeError("Gemini returned no image data.")
 
 
 def main():

@@ -3,6 +3,7 @@ import copy
 import logging
 import random
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -14,6 +15,9 @@ from app.db.models.user import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/game", tags=["Game"])
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+RUN_IMAGE_DIR = REPO_ROOT / "src" / "assets" / "generated" / "run"
 
 # ── Data libraries (ported from frontend) ─────────────────────────────────────
 
@@ -664,8 +668,19 @@ async def broadcast_state(session: GameSession, payload: Dict[str, Any]) -> None
 def _get_level_art_for_run(node_id: str, generated_run: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Return level art from the generated run if available, else static LEVEL_ART."""
     if generated_run and generated_run.get("levelArt", {}).get(node_id):
-        return generated_run["levelArt"][node_id]
-    return get_level_art(node_id)
+        art = copy.deepcopy(generated_run["levelArt"][node_id])
+    else:
+        art = copy.deepcopy(get_level_art(node_id))
+
+    if generated_run and generated_run.get("imagePrompts", {}).get(node_id):
+        enemy_path = RUN_IMAGE_DIR / f"{node_id}-enemy.png"
+        weapon_path = RUN_IMAGE_DIR / f"{node_id}-weapon.png"
+        if enemy_path.exists():
+            art["enemyImage"] = f"/src/assets/generated/run/{node_id}-enemy.png"
+        if weapon_path.exists():
+            art["weaponImage"] = f"/src/assets/generated/run/{node_id}-weapon.png"
+
+    return art
 
 
 def _get_encounters_for_run(battle_type: str, generated_run: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:

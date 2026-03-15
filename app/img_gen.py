@@ -1,5 +1,5 @@
 """
-Async image generation via Hugging Face Inference API (Stable Diffusion XL).
+Async image generation via Google Gemini (Nano Banana / Flash Image).
 
 Used to generate art for LLM-created enemies and weapons at run start.
 Images are saved to src/assets/generated/run/{node_id}-{kind}.png
@@ -8,11 +8,10 @@ Images are saved to src/assets/generated/run/{node_id}-{kind}.png
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ ENEMY_NEGATIVE_PROMPT = (
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "src" / "assets" / "generated" / "run"
 
 
-def _get_hf_token() -> Optional[str]:
+def _get_gemini_key() -> Optional[str]:
     from pathlib import Path as P
     import os as _os
 
@@ -46,35 +45,82 @@ def _get_hf_token() -> Optional[str]:
             key, value = stripped.split("=", 1)
             _os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
-    return _os.environ.get("HF_TOKEN")
+    return _os.environ.get("GEMINI_API_KEY") or _os.environ.get("GOOGLE_API_KEY")
 
 
 def _generate_one_sync(prompt: str, negative_prompt: str, output_path: Path) -> None:
     """Synchronous generation of a single image. Called in a thread pool."""
     try:
-        from huggingface_hub import InferenceClient
+        from google import genai
+        from google.genai import types
     except ImportError:
-        logger.error("huggingface_hub not installed — skipping image generation")
+        logger.error("google-genai not installed — skipping image generation")
         return
 
-    token = _get_hf_token()
-    if not token:
-        logger.warning("HF_TOKEN not set — skipping image generation for %s", output_path.name)
+    api_key = _get_gemini_key()
+    if not api_key:
+        logger.warning(
+            "GEMINI_API_KEY/GOOGLE_API_KEY not set — skipping image generation for %s",
+            output_path.name,
+        )
         return
 
-    client = InferenceClient(provider="hf-inference", api_key=token)
-    image = client.text_to_image(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        model="stabilityai/stable-diffusion-xl-base-1.0",
-        width=1024,
-        height=1024,
-        num_inference_steps=20,
-        guidance_scale=12,
+    model = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+    client = genai.Client(api_key=api_key)
+
+    merged_prompt = f"{prompt}\n\nAvoid: {negative_prompt}"
+    logger.info("Gemini image gen start: model=%s output=%s", model, output_path.name)
+    logger.debug("Prompt for %s:\n%s", output_path.name, merged_prompt)
+
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=[merged_prompt],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(aspect_ratio="1:1"),
+            ),
+        )
+    except Exception:
+        logger.exception("Gemini request failed for %s", output_path.name)
+        return
+
+    parts = getattr(response, "parts", None)
+    candidates = getattr(response, "candidates", None)
+    if not parts and candidates:
+        parts = candidates[0].content.parts
+
+    if not parts:
+        logger.warning("Gemini returned no parts for %s. Response: %r", output_path.name, response)
+        return
+
+    candidate_count = len(candidates) if candidates else 0
+    part_kinds = [type(part).__name__ for part in parts]
+    logger.info(
+        "Gemini response for %s: candidates=%d parts=%s",
+        output_path.name,
+        candidate_count,
+        part_kinds,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output_path)
-    logger.info("Generated %s", output_path.name)
+
+    for part in parts:
+        inline = getattr(part, "inline_data", None)
+        if inline is None:
+            text = getattr(part, "text", None)
+            if text:
+                logger.debug("Gemini non-image part for %s: %s", output_path.name, text[:240])
+            continue
+        try:
+            image = part.as_image()
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            image.save(output_path)
+            logger.info("Generated %s", output_path.name)
+            return
+        except Exception:
+            logger.exception("Failed to decode/save Gemini image for %s", output_path.name)
+            return
+
+    logger.warning("Gemini returned no image data for %s", output_path.name)
 
 
 async def _generate_one_async(prompt: str, negative_prompt: str, output_path: Path) -> None:
@@ -130,4 +176,4 @@ async def _safe_generate(prompt: str, neg: str, path: Path) -> None:
     try:
         await _generate_one_async(prompt, neg, path)
     except Exception as exc:
-        logger.warning("Image generation failed for %s: %s", path.name, exc)
+        logger.exception("Image generation failed for %s", path.name)
