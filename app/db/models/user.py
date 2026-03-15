@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Integer, JSON, DateTime, ForeignKey, Boolean, BigInteger
-from .session import Base  # async declarative base
+from app.db.session import Base  # async declarative base
 from typing import Optional, List
 from datetime import datetime
 

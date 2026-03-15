@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
 from app.db.session import get_session
-from app.db.models import AuthToken, User
+from app.db.models.user import AuthToken, User
 
 bearer_scheme = HTTPBearer()
 
