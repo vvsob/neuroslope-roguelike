@@ -1,5 +1,7 @@
 # Neuroslope Spire
 
+[![Смотреть видео](https://img.youtube.com/vi/CsOpJ_koins/maxresdefault.jpg)](https://youtu.be/CsOpJ_koins)
+
 Neuroslope Spire — браузерный roguelike в духе Slay the Spire, где фронтенд написан на чистом JS, а вся логика игры живёт на FastAPI‑беке. Бекенд симулирует бой и прогресс, фронт только рендерит состояние. И фронт, и API хостятся одним FastAPI‑приложением на порту 8000.
 
 **Стек технологий**
